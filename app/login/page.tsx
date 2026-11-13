@@ -1,12 +1,22 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense, useState } from 'react'
 import { supabaseBrowser } from '../_lib/supabase-browser'
 
 /** Sign in with a one-time code sent by email. A code (not a link) works when the email is opened on another device. */
 export default function Login() {
+  // useSearchParams needs a Suspense boundary so the page can still be prerendered.
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
+  )
+}
+
+function LoginForm() {
   const router = useRouter()
+  const linkExpired = useSearchParams().get('link') === 'expired'
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
@@ -21,7 +31,10 @@ export default function Login() {
     setBusy(true)
     setError(null)
     // shouldCreateUser false: only an account that already exists in Supabase can sign in.
-    const { error } = await supabase!.auth.signInWithOtp({ email: email.trim(), options: { shouldCreateUser: false } })
+    const { error } = await supabase!.auth.signInWithOtp({
+      email: email.trim(),
+      options: { shouldCreateUser: false, emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
     setBusy(false)
     if (error) setError('Could not send a code to that address. Check it is the email this app was set up for.')
     else setSent(true)
@@ -44,6 +57,11 @@ export default function Login() {
   return (
     <section className="mx-auto max-w-sm pt-24">
       <h1 className="t-title">Sign in to Backchannel</h1>
+      {linkExpired && !sent && (
+        <p className="mt-3 t-small text-ink-2" role="status">
+          That sign-in link had expired or was opened in another browser. Request a new code below and type it in instead.
+        </p>
+      )}
       {!sent ? (
         <form onSubmit={sendCode} className="mt-6">
           <label htmlFor="email" className="t-small text-ink-2">
@@ -56,7 +74,7 @@ export default function Login() {
         </form>
       ) : (
         <form onSubmit={verify} className="mt-6">
-          <p className="t-small text-ink-2">We sent a 6-digit code to {email}.</p>
+          <p className="t-small text-ink-2">We sent a 6-digit code to {email}. Type it here, or open the link in the email in this browser.</p>
           <label htmlFor="code" className="mt-5 block t-small text-ink-2">
             Code
           </label>
