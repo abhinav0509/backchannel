@@ -5,9 +5,9 @@ due-diligence report on the company.
 
 ## Current phase
 
-Phase 0 pipeline plus a local Phase 1 web app (Next.js in `app/`). Storage is JSON on disk in
-`data/` behind `src/store/store.ts`; runs execute in-process via `src/store/runner.ts`. Supabase and
-Inngest (PRD section 10) replace those two files when this needs hosting; nothing else should change.
+Pipeline plus web app (Next.js in `app/`), deployed on Vercel with Supabase. Postgres via
+`src/db/db.ts` (Supabase in production; PGlite locally and in tests, same SQL). Web runs execute as
+durable Vercel Workflow steps (`src/workflows`); the CLI runs in-process (`src/store/runner.ts`).
 Work test-first: write the failing test, then the code.
 
 ## Principles that override convenience
@@ -31,6 +31,9 @@ Work test-first: write the failing test, then the code.
 - Every LLM call goes through `llm/call.ts`. No direct SDK calls from stage files.
 - Prompts live in the stage file they belong to, as exported template functions. Not in a prompts/
   folder, not in the database, not inline in the middle of logic.
+- Relative imports are extensionless: the workflow compiler resolves imports literally.
+- Workflow functions (`"use workflow"`) run in a sandbox: import only steps and types there.
+- Every repo function takes the owner and scopes its query by it; RLS is the second line of defence.
 - Every API request is cached by a hash of the full request (`llm/client.ts`), which carries the
   domain, stage prompt and date. A prompt change invalidates its own entries only. `--fresh` bypasses.
 - Search uses `web_search_20250305` on purpose: newer versions returned text without citations.
