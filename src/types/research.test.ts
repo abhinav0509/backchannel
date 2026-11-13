@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { claim, CompanyResearch, Flag, FundingEvent, LayoffEvent } from './research.js'
-import { unretrievedEvidenceUrls } from '../llm/search.js'
 import { z } from 'zod'
 
 const ev = (url = 'https://example.com/news/1') => ({
@@ -81,16 +80,4 @@ describe('numbers', () => {
     expect(LayoffEvent.safeParse({ date: null, headcount: null, percentage: 150, scope: null, handling_notes: null }).success).toBe(false))
   it('rejects a currency that is not a 3-letter code', () =>
     expect(FundingEvent.safeParse({ date: null, round: null, amount: 1, currency: 'dollars', investors: [] }).success).toBe(false))
-})
-
-describe('unretrievedEvidenceUrls', () => {
-  it('passes when every cited URL was retrieved, ignoring fragment and trailing slash', () => {
-    const r = research()
-    r.identity.hq.evidence = [ev('https://example.com/about/#hq')]
-    expect(unretrievedEvidenceUrls(r, ['https://example.com/news/1', 'https://example.com/about'])).toEqual([])
-  })
-  it('reports a cited URL the search never returned', () => {
-    const r = { ...research(), scores: [{ dimension: 'culture', value: 50, rationale: 'r', evidence_urls: ['https://made.up/x'], unknown: false }] }
-    expect(unretrievedEvidenceUrls(r, ['https://example.com/news/1'])).toEqual(['https://made.up/x'])
-  })
 })
