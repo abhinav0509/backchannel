@@ -1,4 +1,4 @@
-# Scout
+# Backchannel
 
 A company research agent for my job search. I paste a recruiter email, it produces a sourced
 due-diligence report on the company.
