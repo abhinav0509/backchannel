@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { migrate, openDb } from './db'
 
@@ -25,6 +28,17 @@ describe('db', () => {
     const rows = await db.query<{ t: string; rls: boolean }>("select relname as t, relrowsecurity as rls from pg_class where relnamespace = 'public'::regnamespace and relkind = 'r' and relname <> 'schema_migrations'")
     expect(rows.every((r) => r.rls)).toBe(true)
     await db.close()
+  })
+
+  it('creates the directory for an on-disk database, and the data persists across reopening', async () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'bc-pg-')), 'nested', 'pglite')
+    const a = openDb(`pglite:${dir}`)
+    await migrate(a)
+    await a.query("insert into llm_cache (key, value) values ('k', '1')")
+    await a.close()
+    const b = openDb(`pglite:${dir}`)
+    expect(await b.query('select key from llm_cache')).toEqual([{ key: 'k' }])
+    await b.close()
   })
 
   it('refuses an unknown database URL', () => expect(() => openDb('mysql://x')).toThrow(/DATABASE_URL/))

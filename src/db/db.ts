@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { PGlite } from '@electric-sql/pglite'
 import postgres from 'postgres'
@@ -35,6 +35,7 @@ export function openDb(url = process.env.DATABASE_URL ?? defaultUrl()): Db {
   }
   if (url.startsWith('pglite:')) {
     const where = url.slice('pglite:'.length)
+    if (where !== 'memory') mkdirSync(where, { recursive: true })
     const pg = new PGlite(where === 'memory' ? undefined : where)
     const ready = pg.exec(LOCAL_PRELUDE)
     return {
@@ -75,7 +76,10 @@ export function getDb(): Promise<Db> {
     const db = openDb()
     if (!(process.env.DATABASE_URL ?? '').startsWith('postgres')) await migrate(db)
     return db
-  })())
+  })().catch((e: unknown) => {
+    g.__backchannelDb = undefined // a failed connection must not be cached: the next request retries
+    throw e
+  }))
 }
 
 /** Tests: a fresh, migrated in-memory database installed as the process database. */

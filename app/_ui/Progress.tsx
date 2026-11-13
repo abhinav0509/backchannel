@@ -57,23 +57,23 @@ function finding(e: RunEvent | undefined): string | null {
 
 export function Progress({ o }: { o: Opportunity }) {
   const run = o.runs.at(-1)
-  const [now, setNow] = useState(() => Date.now())
+  // The clock starts after mount: reading Date.now() during render would differ between server and client.
+  const [now, setNow] = useState<number | null>(null)
   useEffect(() => {
+    setNow(Date.now())
     const t = setInterval(() => setNow(Date.now()), 1000)
     return () => clearInterval(t)
   }, [])
   const latest = new Map<StageName, RunEvent>()
   for (const e of o.events) latest.set(e.stage, e)
-  const secs = run ? Math.max(0, Math.floor((now - new Date(run.started_at).getTime()) / 1000)) : 0
+  const secs = run && now ? Math.max(0, Math.floor((now - new Date(run.started_at).getTime()) / 1000)) : null
   const stages = stagesFor(run?.mode ?? 'triage')
 
   return (
     <section aria-live="polite" className="mb-12 rounded-[22px] border border-line-soft bg-surface p-6">
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">{run?.mode === 'deep' ? 'Researching in depth' : 'Running a quick check'}</h2>
-        <span className="t-small tabular-nums text-ink-3">
-          {Math.floor(secs / 60)}:{String(secs % 60).padStart(2, '0')}
-        </span>
+        <span className="t-small tabular-nums text-ink-3">{secs !== null && `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`}</span>
       </div>
       <ol className="mt-5 space-y-4">
         {stages.map((s) => {

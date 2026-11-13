@@ -89,7 +89,7 @@ export function OpportunityView({ initial }: { initial: Opportunity }) {
                 {domain}
               </a>
             )}
-            <span>Added {age(o.created_at).toLowerCase()}</span>
+            <span suppressHydrationWarning>Added {age(o.created_at).toLowerCase()}</span>
             {totalCost > 0 && <span className="tabular-nums">Research cost {usd(totalCost)}</span>}
           </p>
         </header>
@@ -143,7 +143,7 @@ export function OpportunityView({ initial }: { initial: Opportunity }) {
                 Research again
               </button>
             )}
-            <span className="t-micro text-ink-3">
+            <span className="t-micro text-ink-3" suppressHydrationWarning>
               Researched {age((o.report ?? o.triage)!.generated_at).toLowerCase()}. Companies change; re-run before each interview round.
             </span>
           </footer>
