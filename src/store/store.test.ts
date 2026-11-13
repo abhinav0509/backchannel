@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync } from 'node:fs'
+import { mkdtempSync, readdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -44,5 +44,11 @@ describe('store', () => {
     const o = createOpportunity('x')
     expect(() => updateOpportunity(o.id, (d) => ({ ...d, status: 'bogus' as never }))).toThrow()
     expect(getOpportunity(o.id)?.status).toBe('idle')
+  })
+
+  it('one unreadable record does not take down the list', () => {
+    const good = createOpportunity('x')
+    writeFileSync(join(process.env.BACKCHANNEL_DATA_DIR!, 'opportunities', 'aaaaaaaaaaaaaaaa.json'), '{"id":"aaaaaaaaaaaaaaaa","status":"bogus"}')
+    expect(listOpportunities().map((o) => o.id)).toEqual([good.id])
   })
 })

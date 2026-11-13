@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFile
 import { join } from 'node:path'
 import { z } from 'zod'
 import { Candidate } from '../pipeline/stage1-resolve.js'
+import { log } from '../util/log.js'
 import { CompanyResearch, RunEvent, StageName, TriageResult } from '../types/research.js'
 
 // shortcut: JSON files on local disk, one per opportunity. Swap for Supabase (PRD section 10)
@@ -88,7 +89,14 @@ export function listOpportunities(): Opportunity[] {
   if (!existsSync(dir())) return []
   return readdirSync(dir())
     .filter((f) => f.endsWith('.json'))
-    .flatMap((f) => getOpportunity(f.slice(0, -5)) ?? [])
+    .flatMap((f) => {
+      try {
+        return getOpportunity(f.slice(0, -5)) ?? []
+      } catch (e) {
+        log('store_unreadable', { file: f, error: e instanceof Error ? e.message.slice(0, 300) : String(e) })
+        return []
+      }
+    })
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 

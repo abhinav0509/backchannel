@@ -61,14 +61,18 @@ export const ReviewScore = z.object({
   as_of: PartialDate.nullable(),
 }).refine((r) => r.score <= r.scale, 'score exceeds scale')
 
-export const FlagKind = z.enum([
+// PRD section 5.3: the first twelve are risk flags, the rest green flags.
+export const RISK_KINDS = [
   'layoff_history', 'pe_ownership', 'leadership_churn', 'sentiment_decline',
   'cost_centre_risk', 'site_immaturity', 'role_ambiguity', 'level_mismatch',
   'funding_risk', 'market_commoditisation', 'attrition_signal', 'rto_change',
+] as const
+export const GREEN_KINDS = [
   'site_growth', 'profitable', 'category_leader', 'durable_moat',
   'rare_role', 'product_charter', 'domain_fit', 'design_maturity',
   'public_comp_band', 'tenure_signal',
-])
+] as const
+export const FlagKind = z.enum([...RISK_KINDS, ...GREEN_KINDS])
 
 export const Flag = z.object({
   kind: FlagKind,
@@ -79,10 +83,15 @@ export const Flag = z.object({
   // 'profile' = judged from the JD against the candidate profile, so there is no web source to cite.
   basis: z.enum(['web', 'profile']),
   evidence: z.array(EvidenceRef),
-}).refine((f) => f.basis === 'profile' || f.evidence.length > 0, {
-  message: 'a web-based flag needs at least one evidence reference',
-  path: ['evidence'],
 })
+  .refine((f) => f.basis === 'profile' || f.evidence.length > 0, {
+    message: 'a web-based flag needs at least one evidence reference',
+    path: ['evidence'],
+  })
+  .refine((f) => (f.polarity === 'risk') === (RISK_KINDS as readonly string[]).includes(f.kind), {
+    message: `polarity must match the kind: risk kinds are ${RISK_KINDS.join(', ')}; the others are green. Leave a flag out rather than invert a kind (for example, do not use pe_ownership to say "not PE owned").`,
+    path: ['polarity'],
+  })
 
 export const ScoreDimension = z.enum([
   'role_fit', 'company_health', 'job_security', 'career_signal', 'culture', 'comp_confidence',

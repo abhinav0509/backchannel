@@ -25,7 +25,7 @@ End with one line: whether a full investigation is worth it, and why.
 
 ${researchRules(MAX_SEARCHES)}`
 
-export const triageTask = `flags: only kinds the notes support, using the fixed taxonomy; basis is web. deep_dive: the notes' recommendation and its reason in one sentence; recommend a deep dive when a serious risk appears or the company looks like a strong option.`
+export const triageTask = `flags: only kinds the notes support, using the fixed taxonomy; basis is web. deep_dive: the recommendation and its reason in one or two sentences addressed to the candidate, naming the specific findings (not "the notes"); recommend a deep dive when a serious risk appears or the company looks like a strong option.`
 
 export async function triage(c: { display_name: string; domain: string }, budget: Budget) {
   return researchStage({ stage: 'triage', budget, system: triageSystem, prompt: triagePrompt(c), maxSearches: MAX_SEARCHES, task: triageTask, schema: TriageOut })

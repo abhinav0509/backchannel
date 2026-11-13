@@ -89,3 +89,8 @@ describe('synthPrompt', () => {
     expect(a).toContain('Example Inc.')
   })
 })
+
+it('triage asks for a recommendation addressed to the candidate', async () => {
+  const { triageTask } = await import('./stage-triage.js')
+  expect(triageTask).toMatch(/addressed to the candidate/i)
+})

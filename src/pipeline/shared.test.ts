@@ -35,3 +35,9 @@ it('passes constrained through to extraction', async () => {
   await researchStage({ stage: 'money', budget, system: 's', prompt: 'p', maxSearches: 1, task: 't', schema: z.object({}), constrained: false })
   expect(callStructured.mock.calls.at(-1)?.[0]).toMatchObject({ constrained: false })
 })
+
+it('extraction asks for gaps written to the candidate, not about the pipeline', async () => {
+  const { extractionPrompt } = await import('./shared.js')
+  const p = extractionPrompt({ task: 't', notes: 'n', sources: [], retrievedAt: '2026-11-01T00:00:00.000Z' })
+  expect(p).toMatch(/never mention the notes, quotes or sources/i)
+})

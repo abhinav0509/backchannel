@@ -87,3 +87,15 @@ describe('numbers', () => {
   it('rejects a currency that is not a 3-letter code', () =>
     expect(FundingEvent.safeParse({ date: null, round: null, amount: 1, currency: 'dollars', investors: [] }).success).toBe(false))
 })
+
+describe('flag polarity follows the PRD taxonomy', () => {
+  const f = (kind: string, polarity: string) => ({ kind, polarity, severity: 2, title: 't', detail: 'd', basis: 'profile', evidence: [] })
+  it('accepts a risk kind as a risk and a green kind as green', () => {
+    expect(Flag.safeParse(f('pe_ownership', 'risk')).success).toBe(true)
+    expect(Flag.safeParse(f('profitable', 'green')).success).toBe(true)
+  })
+  it('rejects a risk kind used as a green flag, and the reverse', () => {
+    expect(Flag.safeParse(f('pe_ownership', 'green')).success).toBe(false)
+    expect(Flag.safeParse(f('profitable', 'risk')).success).toBe(false)
+  })
+})

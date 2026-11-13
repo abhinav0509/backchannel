@@ -31,6 +31,7 @@ RULES
 - trust_tier: primary = company filing, press release, own website or government registry; secondary = established press or analyst firm; tertiary = aggregator, blog, review site or search snippet.
 - confidence: confirmed = a primary source supports it; reported = credible secondary press; unverified = one weak source.
 - If something has no cited support, leave it out or null and add a plain sentence to gaps saying what is missing.
+- Write gaps and any free text for the candidate reading the report: say what is unknown and why it matters. Never mention the notes, quotes or sources list, or this conversion.
 
 NOTES
 ${o.notes}
