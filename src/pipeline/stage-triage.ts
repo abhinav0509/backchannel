@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { Flag } from '../types/research.js'
-import type { Budget } from '../util/cost.js'
-import { companyLine, researchRules, researchStage, today } from './shared.js'
+import { Flag } from '../types/research'
+import type { Budget } from '../util/cost'
+import { companyLine, researchRules, researchStage, today } from './shared'
 
 const MAX_SEARCHES = 4
 

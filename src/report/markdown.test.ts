@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { CompanyResearch, EvidenceRef } from '../types/research.js'
-import { toMarkdown } from './markdown.js'
+import type { CompanyResearch, EvidenceRef } from '../types/research'
+import { toMarkdown } from './markdown'
 
 const ev = (url: string, title = 'T'): EvidenceRef => ({
   url, title, publisher: 'Pub', published_at: '2024-02', retrieved_at: '2026-11-13T09:00:00Z', snippet: 'quote', trust_tier: 'secondary',
@@ -79,7 +79,7 @@ describe('toMarkdown', () => {
 
 describe('triageToMarkdown', () => {
   it('leads with the deep-dive recommendation and lists flags, gaps and cost', async () => {
-    const { triageToMarkdown } = await import('./markdown.js')
+    const { triageToMarkdown } = await import('./markdown')
     const r = report()
     const md = triageToMarkdown({
       schema_version: 2, generated_at: r.generated_at, partial: false, identity: r.identity, role: r.role,
@@ -96,7 +96,7 @@ describe('triageToMarkdown', () => {
 
 describe('roleTitle', () => {
   it('prefixes the level only when the title does not already say it', async () => {
-    const { roleTitle } = await import('./markdown.js')
+    const { roleTitle } = await import('./markdown')
     expect(roleTitle('Lead', 'Lead Product Designer')).toBe('Lead Product Designer')
     expect(roleTitle('Senior', 'Product Designer')).toBe('Senior Product Designer')
     expect(roleTitle(null, 'Designer')).toBe('Designer')

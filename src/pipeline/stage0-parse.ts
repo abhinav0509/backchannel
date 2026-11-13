@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { MODELS } from '../config.js'
-import { callStructured } from '../llm/call.js'
-import { Role } from '../types/research.js'
-import type { Budget } from '../util/cost.js'
+import { MODELS } from '../config'
+import { callStructured } from '../llm/call'
+import { Role } from '../types/research'
+import type { Budget } from '../util/cost'
 
 export const ParseOut = z.object({
   company_name: z.string().nullable(),

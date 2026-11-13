@@ -2,8 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
 import { BUDGETS } from '../src/config'
+import { authMode } from '../src/server/auth'
 import { monthSpend } from '../src/util/cost'
 import { usd } from './_lib/format'
+import { currentOwner } from './_lib/session'
+import { SignOut } from './_ui/SignOut'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -18,8 +21,9 @@ export const viewport: Viewport = {
 }
 export const dynamic = 'force-dynamic'
 
-export default function RootLayout({ children }: { children: ReactNode }) {
-  const spent = monthSpend()
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const owner = await currentOwner().catch(() => null)
+  const spent = owner ? await monthSpend() : 0
   const cap = BUDGETS.monthlyUsd
   const share = Math.min(1, spent / cap)
   return (
@@ -30,7 +34,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <Link href="/" className="rounded-md text-[17px] font-[650] tracking-[-0.03em]">
               Backchannel
             </Link>
-            <div className="flex items-center gap-2.5 t-micro text-ink-3" title="Research spend this month. New runs stop at the cap.">
+            {owner && (
+            <nav className="flex items-center gap-5">
+            <div className="hidden items-center gap-2.5 t-micro text-ink-3 sm:flex" title="Research spend this month. New runs stop at the cap.">
               <span className="tabular-nums">
                 {usd(spent)} of {usd(cap)} this month
               </span>
@@ -41,6 +47,12 @@ export default function RootLayout({ children }: { children: ReactNode }) {
                 />
               </span>
             </div>
+              <Link href="/profile" className="rounded-md t-small text-ink-2 hover:text-ink">
+                Profile
+              </Link>
+              {authMode() === 'supabase' && <SignOut />}
+            </nav>
+            )}
           </div>
         </header>
         <main className="mx-auto max-w-[980px] px-5 pb-24">{children}</main>

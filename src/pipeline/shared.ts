@@ -1,8 +1,8 @@
 import type { z } from 'zod'
-import { MODELS } from '../config.js'
-import { callResearch, callStructured, type Source } from '../llm/call.js'
-import type { StageName } from '../types/research.js'
-import type { Budget } from '../util/cost.js'
+import { MODELS } from '../config'
+import { callResearch, callStructured, type Source } from '../llm/call'
+import type { StageName } from '../types/research'
+import type { Budget } from '../util/cost'
 
 export const today = () => new Date().toISOString().slice(0, 10)
 

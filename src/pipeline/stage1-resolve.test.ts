@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gate, type ResolveOut } from './stage1-resolve.js'
+import { gate, type ResolveOut } from './stage1-resolve'
 
 const out = (confidence: number | null, domain = 'example.com'): ResolveOut => ({
   candidates: [],
@@ -19,7 +19,7 @@ describe('gate', () => {
 })
 
 it('the extraction task keeps identity whenever a candidate exists, nulling only unsourced facts', async () => {
-  const { resolveTask } = await import('./stage1-resolve.js')
+  const { resolveTask } = await import('./stage1-resolve')
   expect(resolveTask()).toMatch(/null only if there is no candidate/i)
   expect(resolveTask('example.com')).toContain('example.com')
   expect(resolveTask()).toMatch(/reason: one plain sentence.*no \[n\] markers/i)

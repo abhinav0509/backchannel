@@ -1,11 +1,11 @@
 import { z } from 'zod'
-import { MODELS } from '../config.js'
-import { collectEvidenceUrls } from '../llm/evidence.js'
-import { callStructured } from '../llm/call.js'
-import type { Profile } from '../types/profile.js'
-import { Flag, Score, ScoreDimension, type CompanyResearch } from '../types/research.js'
-import type { Budget } from '../util/cost.js'
-import { today } from './shared.js'
+import { MODELS } from '../config'
+import { collectEvidenceUrls } from '../llm/evidence'
+import { callStructured } from '../llm/call'
+import type { Profile } from '../types/profile'
+import { Flag, Score, ScoreDimension, type CompanyResearch } from '../types/research'
+import type { Budget } from '../util/cost'
+import { today } from './shared'
 
 export const SynthOut = z.object({
   flags: z.array(Flag),

@@ -2,11 +2,11 @@ import 'dotenv/config'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline/promises'
 import { Command } from 'commander'
-import { toMarkdown, triageToMarkdown } from './report/markdown.js'
-import { startRun } from './store/runner.js'
-import { createOpportunity, getOpportunity, type RunRecord } from './store/store.js'
-import { loadProfile } from './types/profile.js'
-import { slug } from './util/slug.js'
+import { toMarkdown, triageToMarkdown } from './report/markdown'
+import { LOCAL_OWNER } from './server/auth'
+import { createOpportunity, getOpportunity, type RunRecord } from './store/repo'
+import { profileFor, runInProcess } from './store/runner'
+import { slug } from './util/slug'
 
 function summary(r: RunRecord | undefined): string {
   if (!r) return ''
@@ -38,16 +38,17 @@ program
     const text = o.file ? readFileSync(o.file, 'utf8') : o.text
     if (!text?.trim()) return program.error('give --file or --text')
     if (o.fresh) process.env.BACKCHANNEL_FRESH = '1'
-    if (!loadProfile()) console.log('No profile.json found: role fit will be marked unknown. Copy profile.example.json to start one.')
-
-    // Saved to the same store as the web app, so terminal runs show up there too.
-    const { id } = createOpportunity(text)
+    // Saved to the same database as the web app (DATABASE_URL), so terminal runs show up there too.
+    // Against Supabase, set BACKCHANNEL_OWNER to your user id so the runs are yours in the app.
+    const owner = process.env.BACKCHANNEL_OWNER ?? LOCAL_OWNER
+    if (!(await profileFor(owner))) console.log('No profile yet: role fit will be marked unknown. Add one on the Profile page, or copy profile.example.json to profile.json.')
+    const { id } = await createOpportunity(owner, text)
     const mode = o.deep ? 'deep' : 'triage'
     let companyDomain = o.companyDomain?.toLowerCase()
 
     for (;;) {
-      await startRun(id, companyDomain ? { mode, companyDomain } : { mode })
-      const opp = getOpportunity(id)! // non-null: created above and never deleted
+      await runInProcess(owner, id, companyDomain ? { mode, companyDomain } : { mode })
+      const opp = (await getOpportunity(owner, id))! // non-null: created above and never deleted
       console.log(summary(opp.runs.at(-1)))
 
       if (opp.status === 'failed') {
@@ -87,4 +88,16 @@ program
     }
   })
 
+program
+  .command('migrate')
+  .description('apply database migrations to DATABASE_URL (run once against Supabase, and after upgrades)')
+  .action(async () => {
+    const { migrate, openDb } = await import('./db/db')
+    const db = openDb()
+    const applied = await migrate(db)
+    await db.close()
+    console.log(applied.length ? `Applied ${applied.join(', ')}` : 'Database is up to date.')
+  })
+
 await program.parseAsync()
+process.exit(process.exitCode ?? 0) // close the database pool

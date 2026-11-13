@@ -57,3 +57,11 @@ describe('cleanQuote', () => {
     expect(cleanQuote('- Traded as: [Nasdaq](https://x.example): TEAM')).toBe('Traded as: Nasdaq: TEAM')
   })
 })
+
+describe('parseList', () => {
+  it('splits on commas and new lines, trims and drops empties and duplicates', async () => {
+    const { parseList } = await import('./format')
+    expect(parseList('design systems, prototyping,\n  AI UX \n\n, prototyping')).toEqual(['design systems', 'prototyping', 'AI UX'])
+    expect(parseList('   ')).toEqual([])
+  })
+})

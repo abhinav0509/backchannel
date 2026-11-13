@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { check, get } from './assert.js'
+import { check, get } from './assert'
 
 const doc = {
   identity: { domain: 'example.com' },

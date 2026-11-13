@@ -1,4 +1,4 @@
-import type { CompanyResearch, EvidenceRef, TriageResult } from '../types/research.js'
+import type { CompanyResearch, EvidenceRef, TriageResult } from '../types/research'
 
 // Placeholder data for tests and UI previews only. Not facts about any real company.
 export const ev = (url = 'https://news.example/a', o: Partial<EvidenceRef> = {}): EvidenceRef => ({

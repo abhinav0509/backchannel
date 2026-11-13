@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import type { Opportunity } from '../../src/store/store'
+import type { Opportunity } from '../../src/store/repo'
 
 const DOMAIN = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { claim, CompanyResearch, Flag, FundingEvent, LayoffEvent } from './research.js'
+import { claim, CompanyResearch, Flag, FundingEvent, LayoffEvent } from './research'
 import { z } from 'zod'
 
 const ev = (url = 'https://example.com/news/1') => ({

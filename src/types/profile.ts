@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { z } from 'zod'
-import { ScoreDimension } from './research.js'
+import { ScoreDimension } from './research'
 
 // PRD section 5.4 defaults, in percent.
 export const DEFAULT_WEIGHTS = {

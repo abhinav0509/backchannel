@@ -1,22 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Budget } from '../util/cost.js'
-import { CompanyResearch, TriageResult } from '../types/research.js'
-import type { RunEvent } from './run.js'
+import { Budget } from '../util/cost'
+import { CompanyResearch, TriageResult } from '../types/research'
+import type { RunEvent } from './run'
 
 const m = vi.hoisted(() => ({
   parse: vi.fn(), resolve: vi.fn(), money: vi.fn(), people: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
 }))
-vi.mock('./stage0-parse.js', () => ({ parse: m.parse }))
-vi.mock('./stage1-resolve.js', async (orig) => ({ ...(await orig<typeof import('./stage1-resolve.js')>()), resolve: m.resolve }))
-vi.mock('./stage3-money.js', () => ({ money: m.money }))
-vi.mock('./stage4-people.js', () => ({ people: m.people }))
-vi.mock('./stage8-synthesize.js', () => ({ synthesize: m.synthesize }))
-vi.mock('./stage-triage.js', () => ({ triage: m.triage }))
-vi.mock('../util/cost.js', async (orig) => {
-  const mod = await orig<typeof import('../util/cost.js')>()
-  return { ...mod, runBudget: () => new mod.Budget({ searchesPerRun: 40, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 }) }
+vi.mock('./stage0-parse', () => ({ parse: m.parse }))
+vi.mock('./stage1-resolve', async (orig) => ({ ...(await orig<typeof import('./stage1-resolve')>()), resolve: m.resolve }))
+vi.mock('./stage3-money', () => ({ money: m.money }))
+vi.mock('./stage4-people', () => ({ people: m.people }))
+vi.mock('./stage8-synthesize', () => ({ synthesize: m.synthesize }))
+vi.mock('./stage-triage', () => ({ triage: m.triage }))
+vi.mock('../util/cost', async (orig) => {
+  const mod = await orig<typeof import('../util/cost')>()
+  return { ...mod, runBudget: async () => new mod.Budget({ searchesPerRun: 40, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 }) }
 })
-const { runResearch } = await import('./run.js')
+const { runResearch } = await import('./run')
 
 // Placeholder values only, not facts about a real company.
 const ev = { url: 'https://a.example/1', title: 'T', publisher: null, published_at: null, retrieved_at: '2026-11-13T09:00:00Z', snippet: 's', trust_tier: 'secondary' }
@@ -91,7 +91,7 @@ describe('deep run', () => {
 
   it('emits stage events in order, with outputs, for live progress', async () => {
     const events: RunEvent[] = []
-    await runResearch({ text: 't', mode: 'deep', profile: null, onEvent: (e) => events.push(e) })
+    await runResearch({ text: 't', mode: 'deep', profile: null, onEvent: (e) => void events.push(e) })
     const seq = events.map((e) => `${e.stage}:${e.status}`)
     expect(seq.slice(0, 4)).toEqual(['parse:started', 'parse:ok', 'resolve:started', 'resolve:ok'])
     expect(seq).toContain('money:ok')

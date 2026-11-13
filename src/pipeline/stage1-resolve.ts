@@ -1,8 +1,8 @@
 import { z } from 'zod'
-import { Domain, Identity } from '../types/research.js'
-import type { Budget } from '../util/cost.js'
-import { researchRules, researchStage, today } from './shared.js'
-import type { ParseOut } from './stage0-parse.js'
+import { Domain, Identity } from '../types/research'
+import type { Budget } from '../util/cost'
+import { researchRules, researchStage, today } from './shared'
+import type { ParseOut } from './stage0-parse'
 
 export const RESOLVE_THRESHOLD = 0.8
 const MAX_SEARCHES = 4

@@ -1,71 +1,77 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { useTestDb } from '../db/db'
 
-const startRun = vi.hoisted(() => vi.fn(async () => {}))
-const isActive = vi.hoisted(() => vi.fn((_id: string) => false))
-vi.mock('../store/runner.js', async (orig) => ({ ...(await orig<typeof import('../store/runner.js')>()), startRun, isActive }))
-const { createOpportunity, updateOpportunity } = await import('../store/store.js')
-const { validReport, validTriage, ev } = await import('../test/fixtures.js')
-const api = await import('./api.js')
-type Summary = import('./api.js').Summary
+const start = vi.hoisted(() => vi.fn(async (..._args: unknown[]) => ({ runId: 'wrun_1' })))
+vi.mock('workflow/api', () => ({ start }))
+const repo = await import('../store/repo')
+const { validReport, validTriage, ev } = await import('../test/fixtures')
+const api = await import('./api')
+type Summary = import('./api').Summary
 
-beforeEach(() => {
-  process.env.BACKCHANNEL_DATA_DIR = mkdtempSync(join(tmpdir(), 'bc-api-'))
-  startRun.mockClear()
-  isActive.mockReturnValue(false)
+const ME = '00000000-0000-0000-0000-00000000000a'
+const OTHER = '00000000-0000-0000-0000-00000000000b'
+
+beforeEach(async () => {
+  await useTestDb()
+  start.mockClear()
 })
 
 describe('create', () => {
-  it('stores the text and starts a run in the requested mode', async () => {
-    const r = await api.create({ text: 'A role at Example', mode: 'triage' })
+  it('stores the text, opens a run and starts the durable workflow for it', async () => {
+    const r = await api.create(ME, { text: 'A role at Example', mode: 'triage' })
     expect(r.status).toBe(201)
     const id = (r.body as { id: string }).id
-    expect(startRun).toHaveBeenCalledWith(id, { mode: 'triage' })
+    const o = (await repo.getOpportunity(ME, id))!
+    expect(o.status).toBe('running')
+    expect(start).toHaveBeenCalledWith(expect.any(Function), [{ owner: ME, oppId: id, runId: o.runs[0]!.id, mode: 'triage', text: 'A role at Example' }])
   })
 
-  it.each([
-    [{ text: '', mode: 'triage' }],
-    [{ text: 'x', mode: 'turbo' }],
-    [{ text: 'x'.repeat(60_001), mode: 'deep' }],
-    ['not an object'],
-  ])('rejects bad input %#', async (body) => {
-    const r = await api.create(body)
-    expect(r.status).toBe(400)
-    expect(startRun).not.toHaveBeenCalled()
+  it.each([[{ text: '', mode: 'triage' }], [{ text: 'x', mode: 'turbo' }], [{ text: 'x'.repeat(60_001), mode: 'deep' }], ['not an object']])('rejects bad input %#', async (body) => {
+    expect((await api.create(ME, body)).status).toBe(400)
+    expect(start).not.toHaveBeenCalled()
+  })
+
+  it('marks the run failed if the workflow cannot be started', async () => {
+    start.mockRejectedValueOnce(new Error('queue down'))
+    const r = await api.create(ME, { text: 'x', mode: 'triage' })
+    expect(r.status).toBe(502)
+    const o = (await repo.listOpportunities(ME))[0]!
+    expect(o).toMatchObject({ status: 'failed', error: expect.stringMatching(/queue down/) })
   })
 })
 
 describe('run', () => {
   it('starts a run, passing a chosen domain through', async () => {
-    const o = createOpportunity('x')
-    const r = await api.run(o.id, { mode: 'deep', companyDomain: 'example.com' })
-    expect(r.status).toBe(202)
-    expect(startRun).toHaveBeenCalledWith(o.id, { mode: 'deep', companyDomain: 'example.com' })
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.run(ME, o.id, { mode: 'deep', companyDomain: 'example.com' })).status).toBe(202)
+    expect(start.mock.calls[0]?.[1]).toEqual([expect.objectContaining({ mode: 'deep', companyDomain: 'example.com' })])
   })
 
-  it('404s an unknown id, 409s while running, 400s a malformed domain', async () => {
-    expect((await api.run('unknownid0', { mode: 'deep' })).status).toBe(404)
-    const o = createOpportunity('x')
-    expect((await api.run(o.id, { mode: 'deep', companyDomain: 'https://x.com' })).status).toBe(400)
-    isActive.mockReturnValue(true)
-    expect((await api.run(o.id, { mode: 'deep' })).status).toBe(409)
+  it('reuses the resolved domain for a deep run after a quick check', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await repo.patchOpportunity(ME, o.id, { domain: 'example.com' })
+    await api.run(ME, o.id, { mode: 'deep' })
+    expect(start.mock.calls[0]?.[1]).toEqual([expect.objectContaining({ companyDomain: 'example.com' })])
   })
-})
 
-describe('get', () => {
-  it('404s unknown, and reports a run cut off by a restart as interrupted', () => {
-    expect(api.get('unknownid0').status).toBe(404)
-    const o = createOpportunity('x')
-    updateOpportunity(o.id, (d) => ({ ...d, status: 'running' }))
-    expect(api.get(o.id).body).toMatchObject({ status: 'failed', error: expect.stringMatching(/interrupted/) })
+  it('404s an unknown or someone else’s id, 409s while running, 400s a malformed domain', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.run(OTHER, o.id, { mode: 'deep' })).status).toBe(404)
+    expect((await api.run(ME, o.id, { mode: 'deep', companyDomain: 'https://x.com' })).status).toBe(400)
+    await repo.beginRun(ME, o.id, 'triage')
+    expect((await api.run(ME, o.id, { mode: 'deep' })).status).toBe(409)
   })
 })
 
-describe('list summaries', () => {
-  it('summarises a researched opportunity with its score parts and top flags, never a blended score', () => {
-    const o = createOpportunity('x')
+describe('get and list', () => {
+  it('404s what the owner cannot see', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.get(OTHER, o.id)).status).toBe(404)
+    expect((await api.get(ME, o.id)).status).toBe(200)
+  })
+
+  it('summarises with score parts and top flags, never a blended score', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
     const report = validReport()
     report.verdict = 'Main risk is ownership. More detail follows.'
     report.scores = [
@@ -77,43 +83,43 @@ describe('list summaries', () => {
       { kind: 'pe_ownership', polarity: 'risk', severity: 4, title: 'PE owned', detail: 'd', basis: 'web', evidence: [ev()] },
       { kind: 'layoff_history', polarity: 'risk', severity: 5, title: 'Layoffs', detail: 'd', basis: 'web', evidence: [ev()] },
     ]
-    updateOpportunity(o.id, (d) => ({ ...d, status: 'done', company: 'Example', role: 'Designer', report, runs: [] }))
-    const [s] = api.list().body as Summary[]
+    await repo.patchOpportunity(ME, o.id, { status: 'done', company: 'Example', role: 'Designer', report })
+    const [s] = (await api.list(ME)).body as Summary[]
     expect(s).toMatchObject({ id: o.id, company: 'Example', headline: 'Main risk is ownership.', depth: 'deep' })
     expect(s!.flags.map((f) => f.title)).toEqual(['Layoffs', 'PE owned'])
     expect(s!.scores).toEqual([{ dimension: 'job_security', value: 30, unknown: false }, { dimension: 'comp_confidence', value: 0, unknown: true }])
     expect(s).not.toHaveProperty('score')
   })
 
-  it('falls back to the triage recommendation, and shows the live stage while running', () => {
-    const a = createOpportunity('x')
-    updateOpportunity(a.id, (d) => ({ ...d, status: 'done', triage: validTriage() }))
-    const b = createOpportunity('y')
-    updateOpportunity(b.id, (d) => ({ ...d, status: 'running', events: [{ stage: 'money', status: 'started', at: '2026-11-13T09:00:00.000Z' }] }))
-    isActive.mockImplementation((id: string) => id === b.id)
-    const [rb, ra] = api.list().body as Summary[]
-    expect(ra).toMatchObject({ depth: 'triage', recommendation: 'deep', headline: 'Placeholder reason.' })
-    expect(rb).toMatchObject({ status: 'running', stage: 'money' })
-  })
-
-  it('totals the cost across runs', () => {
-    const o = createOpportunity('x')
-    const run = { id: 'r', mode: 'triage' as const, started_at: '2026-11-13T09:00:00.000Z', finished_at: null, status: 'done' as const, cost_usd: 0.2, searches: 1, input_tokens: 1, output_tokens: 1, stages: {}, error: null }
-    updateOpportunity(o.id, (d) => ({ ...d, runs: [run, { ...run, id: 's', cost_usd: 1.05 }] }))
-    expect((api.list().body as Summary[])[0]?.cost_usd).toBeCloseTo(1.25)
+  it('falls back to the triage recommendation, and shows the live stage while running', async () => {
+    const a = await repo.createOpportunity(ME, 'x')
+    await repo.patchOpportunity(ME, a.id, { status: 'done', triage: validTriage() })
+    const b = await repo.createOpportunity(ME, 'y')
+    const run = await repo.beginRun(ME, b.id, 'deep')
+    await repo.recordEvent(ME, b.id, run, { stage: 'money', status: 'started', at: '2026-11-13T09:00:00.000Z' })
+    const list = (await api.list(ME)).body as Summary[]
+    expect(list.find((x) => x.id === a.id)).toMatchObject({ depth: 'triage', recommendation: 'deep', headline: 'Placeholder reason.' })
+    expect(list.find((x) => x.id === b.id)).toMatchObject({ status: 'running', stage: 'money' })
   })
 })
 
 describe('markdown', () => {
-  it('returns the deep report as markdown, else the triage, else 404', () => {
-    expect(api.markdown('unknownid0').status).toBe(404)
-    const o = createOpportunity('x')
-    expect(api.markdown(o.id).status).toBe(404)
-    updateOpportunity(o.id, (d) => ({ ...d, triage: validTriage() }))
-    expect(api.markdown(o.id).body).toMatch(/quick check/)
-    updateOpportunity(o.id, (d) => ({ ...d, report: validReport() }))
-    const r = api.markdown(o.id)
-    expect(r).toMatchObject({ status: 200, filename: 'example-product-designer.md' })
-    expect(r.body).toMatch(/^# Example: Product Designer/)
+  it('returns the deep report, else the triage, else 404', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.markdown(ME, o.id)).status).toBe(404)
+    await repo.patchOpportunity(ME, o.id, { triage: validTriage() })
+    expect((await api.markdown(ME, o.id)).body).toMatch(/quick check/)
+    await repo.patchOpportunity(ME, o.id, { report: validReport() })
+    expect(await api.markdown(ME, o.id)).toMatchObject({ status: 200, filename: 'example-product-designer.md' })
+    expect((await api.markdown(OTHER, o.id)).status).toBe(404)
+  })
+})
+
+describe('profile', () => {
+  it('reads null, saves a valid profile, rejects an invalid one', async () => {
+    expect((await api.getProfile(ME)).body).toBeNull()
+    expect((await api.saveProfile(ME, { headline: 'Designer', years_experience: 8 })).status).toBe(200)
+    expect((await api.getProfile(ME)).body).toMatchObject({ headline: 'Designer' })
+    expect((await api.saveProfile(ME, { headline: '', years_experience: -1 })).status).toBe(400)
   })
 })

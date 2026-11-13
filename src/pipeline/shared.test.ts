@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { Budget } from '../util/cost.js'
+import { Budget } from '../util/cost'
 
 const callResearch = vi.hoisted(() => vi.fn())
 const callStructured = vi.hoisted(() => vi.fn())
-vi.mock('../llm/call.js', () => ({ callResearch, callStructured }))
-const { researchStage } = await import('./shared.js')
+vi.mock('../llm/call', () => ({ callResearch, callStructured }))
+const { researchStage } = await import('./shared')
 
 describe('researchStage', () => {
   it('researches with search, then extracts with the retrieved URLs as the evidence allow-list', async () => {
@@ -37,7 +37,7 @@ it('passes constrained through to extraction', async () => {
 })
 
 it('extraction asks for gaps written to the candidate, not about the pipeline', async () => {
-  const { extractionPrompt } = await import('./shared.js')
+  const { extractionPrompt } = await import('./shared')
   const p = extractionPrompt({ task: 't', notes: 'n', sources: [], retrievedAt: '2026-11-01T00:00:00.000Z' })
   expect(p).toMatch(/never mention the notes, quotes or sources/i)
 })

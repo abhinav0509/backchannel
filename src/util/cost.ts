@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname } from 'node:path'
-import { BUDGETS } from '../config.js'
-import type { StageName } from '../types/research.js'
+import { BUDGETS } from '../config'
+import { getDb } from '../db/db'
+import type { StageName } from '../types/research'
 
 export interface Spend {
   input: number
@@ -37,15 +36,25 @@ export function costUsd(model: string, u: Usage): number {
 
 export class BudgetExceeded extends Error {}
 
-/** Per-run accounting with hard limits. Every API call is charged here; the next call is refused once a limit is hit. */
+type Persist = (stage: StageName, model: string, u: Usage, usd: number) => Promise<void>
+
+/**
+ * Per-run accounting with hard limits. Every API call is charged here and the next call is
+ * refused once a limit is hit. Charges are persisted (see flush) so the monthly cap holds across
+ * processes, durable workflow steps and the CLI.
+ */
 export class Budget {
   readonly stages: Partial<Record<StageName, Spend>> = {}
-  readonly total: Spend = zeroSpend()
+  readonly total: Spend
+  private pending: Promise<void>[] = []
 
   constructor(
     private readonly limits: { searchesPerRun: number; tokensPerRun: number },
-    private readonly month: { spentBefore: number; capUsd: number; record?: (monthTotalUsd: number) => void },
-  ) {}
+    private readonly month: { spentBefore: number; capUsd: number },
+    private readonly opts: { initial?: Spend; persist?: Persist } = {},
+  ) {
+    this.total = { ...(opts.initial ?? zeroSpend()) }
+  }
 
   get remainingSearches(): number {
     return Math.max(0, this.limits.searchesPerRun - this.total.searches)
@@ -69,32 +78,54 @@ export class Budget {
       t.searches += u.searches
       t.usd += usd
     }
-    this.month.record?.(this.month.spentBefore + this.total.usd)
+    if (this.opts.persist) this.pending.push(this.opts.persist(stage, model, u, usd))
     return usd
+  }
+
+  /** Waits until every charge so far is written. Call before the next billed request. */
+  async flush(): Promise<void> {
+    const p = this.pending
+    this.pending = []
+    await Promise.all(p)
   }
 }
 
-// Monthly spend ledger: { "2026-11": 3.21 }. Evals count toward the cap too.
-// shortcut: two runs in parallel processes can overwrite each other's total; fine for one user.
-const LEDGER = 'cache/spend.json'
-const monthKey = (d = new Date()) => d.toISOString().slice(0, 7)
+const SPEND_COLUMNS = `coalesce(sum(input_tokens), 0)::int as input, coalesce(sum(output_tokens), 0)::int as output,
+  coalesce(sum(cache_read_tokens), 0)::int as "cacheRead", coalesce(sum(cache_write_tokens), 0)::int as "cacheWrite",
+  coalesce(sum(searches), 0)::int as searches, coalesce(sum(usd), 0)::float8 as usd`
 
-function readLedger(file: string): Record<string, number> {
-  return existsSync(file) ? (JSON.parse(readFileSync(file, 'utf8')) as Record<string, number>) : {}
+/** Spend recorded since the start of this calendar month (UTC), across every run and process. */
+export async function monthSpend(): Promise<number> {
+  const [row] = await (await getDb()).query<{ usd: number }>(
+    "select coalesce(sum(usd), 0)::float8 as usd from spend where at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'",
+  )
+  return row?.usd ?? 0
 }
 
-export function monthSpend(file = LEDGER): number {
-  return readLedger(file)[monthKey()] ?? 0
+/** One run's totals and per-stage breakdown. */
+export async function runSpend(runId: string): Promise<Spend & { stages: Partial<Record<StageName, Spend>> }> {
+  const db = await getDb()
+  const [total] = await db.query<Spend>(`select ${SPEND_COLUMNS} from spend where run_id = $1`, [runId])
+  const rows = await db.query<Spend & { stage: StageName }>(`select stage, ${SPEND_COLUMNS} from spend where run_id = $1 group by stage`, [runId])
+  return { ...(total ?? zeroSpend()), stages: Object.fromEntries(rows.map(({ stage, ...s }) => [stage, s])) }
 }
 
-export function runBudget(mode: 'triage' | 'deep', file = LEDGER): Budget {
-  const month = monthKey()
-  return new Budget(BUDGETS[mode], {
-    spentBefore: readLedger(file)[month] ?? 0,
-    capUsd: BUDGETS.monthlyUsd,
-    record: (usd) => {
-      mkdirSync(dirname(file), { recursive: true })
-      writeFileSync(file, JSON.stringify({ ...readLedger(file), [month]: Number(usd.toFixed(6)) }, null, 2))
+/** A budget for a run (or for one durable step of it), seeded with what the month and the run have already spent. */
+export async function runBudget(mode: 'triage' | 'deep', runId: string | null): Promise<Budget> {
+  const db = await getDb()
+  const [month, initial] = await Promise.all([monthSpend(), runId ? runSpend(runId) : Promise.resolve(zeroSpend())])
+  return new Budget(
+    BUDGETS[mode],
+    { spentBefore: month - initial.usd, capUsd: BUDGETS.monthlyUsd },
+    {
+      initial: { input: initial.input, output: initial.output, cacheRead: initial.cacheRead, cacheWrite: initial.cacheWrite, searches: initial.searches, usd: initial.usd },
+      persist: async (stage, model, u, usd) => {
+        await db.query(
+          `insert into spend (run_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [runId, stage, model, u.input, u.output, u.cacheRead, u.cacheWrite, u.searches, usd],
+        )
+      },
     },
-  })
+  )
 }

@@ -89,3 +89,6 @@ export const cleanQuote = (q: string) =>
     .replace(/\*\*|__|`/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+
+/** "a, b\nc" -> ["a", "b", "c"]: how list fields are typed in forms. */
+export const parseList = (s: string) => [...new Set(s.split(/[,\n]/).map((x) => x.trim()).filter(Boolean))]

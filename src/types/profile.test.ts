@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_WEIGHTS, loadProfile, Profile } from './profile.js'
+import { DEFAULT_WEIGHTS, loadProfile, Profile } from './profile'
 
 describe('profile', () => {
   it('default weights match the PRD and sum to 100', () => {

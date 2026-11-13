@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
-import type { Opportunity } from '../../src/store/store'
+import type { Opportunity } from '../../src/store/repo'
 import { age, usd } from '../_lib/format'
 import { sourceIndex } from '../_lib/sources'
+import { supabaseBrowser } from '../_lib/supabase-browser'
 import { Choice } from './Choice'
 import { CompanyReport } from './CompanyReport'
 import { Decision } from './Decision'
@@ -16,16 +17,29 @@ import { TriageView } from './TriageView'
 
 type Tab = 'decision' | 'company' | 'run'
 
-/** Polls while research runs, so each section fills in the moment its stage finishes. */
+/**
+ * Keeps the page current while research runs, so each section fills in the moment its stage
+ * finishes. With Supabase, new run events arrive over Realtime and a slow poll is only a safety
+ * net; locally it polls.
+ */
 function useLive(initial: Opportunity) {
   const [o, setO] = useState(initial)
   useEffect(() => {
     if (o.status !== 'running') return
-    const t = setInterval(async () => {
+    const refresh = async () => {
       const res = await fetch(`/api/opportunities/${o.id}`, { cache: 'no-store' })
       if (res.ok) setO((await res.json()) as Opportunity)
-    }, 1200)
-    return () => clearInterval(t)
+    }
+    const supabase = supabaseBrowser()
+    const channel = supabase
+      ?.channel(`run-events-${o.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'run_events', filter: `opportunity_id=eq.${o.id}` }, () => void refresh())
+      .subscribe()
+    const t = setInterval(refresh, supabase ? 8000 : 1200)
+    return () => {
+      clearInterval(t)
+      if (channel) void supabase?.removeChannel(channel)
+    }
   }, [o.id, o.status])
   return [o, setO] as const
 }

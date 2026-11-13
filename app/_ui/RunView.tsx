@@ -1,7 +1,7 @@
 'use client'
 
 import { useContext } from 'react'
-import type { Opportunity } from '../../src/store/store'
+import type { Opportunity } from '../../src/store/repo'
 import type { StageName } from '../../src/types/research'
 import { age, stageLabel, usd } from '../_lib/format'
 import { SourcesContext } from './Evidence'

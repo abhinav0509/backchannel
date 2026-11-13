@@ -1,15 +1,18 @@
 import Link from 'next/link'
 import { list, type Summary } from '../src/server/api'
+import { requireOwner } from './_lib/session'
 import { age, flagLabel, stageLabel } from './_lib/format'
+import { AutoRefresh } from './_ui/AutoRefresh'
 import { Intake } from './_ui/Intake'
 import { ScoreGlyph } from './_ui/ScoreGlyph'
 
 export const dynamic = 'force-dynamic'
 
-export default function Inbox() {
-  const items = list().body as Summary[]
+export default async function Inbox() {
+  const items = (await list(await requireOwner())).body as Summary[]
   return (
     <>
+      <AutoRefresh active={items.some((o) => o.status === 'running')} />
       <section className="pt-14 pb-10 sm:pt-20">
         <h1 className="t-display max-w-[16ch]">Know the company before the first call.</h1>
         <p className="t-lede mt-3 max-w-[38ch] text-ink-2">Paste what the recruiter sent. Every finding comes back with the source behind it.</p>

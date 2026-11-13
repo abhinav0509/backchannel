@@ -1,5 +1,5 @@
-import { collectEvidenceUrls } from '../llm/evidence.js'
-import type { CompanyResearch, EvidenceRef, Flag, Score, TriageResult } from '../types/research.js'
+import { collectEvidenceUrls } from '../llm/evidence'
+import type { CompanyResearch, EvidenceRef, Flag, Score, TriageResult } from '../types/research'
 
 type C<T> = { value: T; confidence: string; evidence: EvidenceRef[] }
 

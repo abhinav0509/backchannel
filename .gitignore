@@ -10,3 +10,6 @@ next-env.d.ts
 *.tsbuildinfo
 .playwright-mcp/
 AGENTS.md
+/.swc
+.data/
+.workflow-data/

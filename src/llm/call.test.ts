@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { Budget } from '../util/cost.js'
+import { Budget } from '../util/cost'
 
 const send = vi.fn()
-vi.mock('./client.js', () => ({ send: (...a: unknown[]) => send(...a), assertSearchSupported: async () => {} }))
-const { callResearch, callStructured, ValidationFailed } = await import('./call.js')
+vi.mock('./client', () => ({ send: (...a: unknown[]) => send(...a), assertSearchSupported: async () => {} }))
+const { callResearch, callStructured, ValidationFailed } = await import('./call')
 
 const text = (t: string) => ({ content: [{ type: 'text', text: t }], searchCapped: false })
 const budget = () => new Budget({ searchesPerRun: 10, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 })

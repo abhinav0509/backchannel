@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import type { Opportunity } from '../../src/store/store'
+import type { Opportunity } from '../../src/store/repo'
 import type { RunEvent, StageName } from '../../src/types/research'
 import { ownershipLabel, stageLabel, stagesFor } from '../_lib/format'
 

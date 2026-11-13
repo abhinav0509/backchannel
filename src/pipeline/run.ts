@@ -1,12 +1,12 @@
-import type { Profile } from '../types/profile.js'
-import type { CompanyResearch, RunEvent, StageName, StageStatus, TriageResult } from '../types/research.js'
-import { runBudget, type Budget } from '../util/cost.js'
-import { money } from './stage3-money.js'
-import { people } from './stage4-people.js'
-import { synthesize, type Draft } from './stage8-synthesize.js'
-import { parse } from './stage0-parse.js'
-import { gate, resolve, type Candidate } from './stage1-resolve.js'
-import { triage } from './stage-triage.js'
+import type { Profile } from '../types/profile'
+import type { CompanyResearch, Flag, RunEvent, StageName, StageStatus, TriageResult } from '../types/research'
+import { runBudget, type Budget, type Spend } from '../util/cost'
+import { parse, type ParseOut } from './stage0-parse'
+import { gate, resolve, type Candidate, type ResolveOut } from './stage1-resolve'
+import { money, type MoneyOut } from './stage3-money'
+import { people, type PeopleOut } from './stage4-people'
+import { synthesize, type Draft, type SynthOut } from './stage8-synthesize'
+import { triage, type TriageOut } from './stage-triage'
 
 export type { RunEvent }
 
@@ -15,130 +15,179 @@ export type RunOutcome =
   | { kind: 'triage'; result: TriageResult; budget: Budget }
   | { kind: 'needs_choice'; reason: string; candidates: Candidate[]; gaps: string[]; budget: Budget }
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+/** What one stage produced. Plain data, so it can cross a durable-workflow step boundary. */
+export interface StageResult<T> {
+  data: T | null
+  dropped: string[]
+  searchCapped: boolean
+  error?: string
+}
+
+export const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
 const unique = (xs: string[]) => [...new Set(xs)]
+
+export const statusOf = (r: StageResult<unknown>): StageStatus => (r.error || r.data === null ? 'failed' : r.searchCapped ? 'partial' : 'ok')
+
+/** The gaps a stage contributes: its own, what it dropped, and why it stopped if it did. */
+export function stageGaps(name: StageName, r: StageResult<{ gaps?: string[] }>): string[] {
+  if (r.error || r.data === null) return [`${name} research did not complete: ${r.error ?? 'no result'}`]
+  return [...(r.searchCapped ? [`${name}: hit its search limit before finishing, so this section may be incomplete.`] : []), ...(r.data.gaps ?? []), ...r.dropped]
+}
+
+export type GateResult =
+  | { kind: 'pass'; identity: NonNullable<ResolveOut['identity']>; gaps: string[] }
+  | { kind: 'ask'; reason: string; candidates: Candidate[]; gaps: string[] }
+  | { kind: 'mismatch'; message: string }
+
+export function gateOutcome(out: ResolveOut, dropped: string[], companyDomain?: string): GateResult {
+  const g = gate(out, companyDomain)
+  if (g === 'mismatch')
+    return {
+      kind: 'mismatch',
+      message: out.identity
+        ? `you gave ${companyDomain}, but research resolved ${out.identity.domain}; check the domain`
+        : `could not identify the company at ${companyDomain}:\n  ${[...out.gaps, ...dropped].join('\n  ')}`,
+    }
+  if (g === 'ask' || !out.identity)
+    return {
+      kind: 'ask',
+      reason: out.identity ? `resolution confidence ${out.identity.resolution_confidence} is below 0.8` : 'no company could be identified from the text',
+      candidates: out.candidates,
+      gaps: [...out.gaps, ...dropped],
+    }
+  return { kind: 'pass', identity: out.identity, gaps: [...out.gaps, ...dropped] }
+}
+
+export interface Totals {
+  spend: Spend
+  durationMs: number
+}
+
+const runField = (mode: 'triage' | 'deep', t: Totals, stage_status: Partial<Record<StageName, StageStatus>>) => ({
+  mode,
+  searches_used: t.spend.searches,
+  input_tokens: t.spend.input + t.spend.cacheRead + t.spend.cacheWrite,
+  output_tokens: t.spend.output,
+  cost_usd: Number(t.spend.usd.toFixed(4)),
+  duration_ms: t.durationMs,
+  stage_status,
+})
 
 const EMPTY_MONEY = { ownership_type: null, funding_events: [], revenue_signal: null, profitability: null, exit_activity: [] }
 const EMPTY_PEOPLE = { headcount: null, headcount_trend: null, layoff_events: [], leadership_changes: [], review_scores: [] }
+const strip = <T extends { gaps: string[] }>({ gaps: _g, ...rest }: T) => rest
 
-export async function runResearch(input: {
-  text: string
-  mode: 'triage' | 'deep'
-  profile: Profile | null
-  companyDomain?: string
-  onEvent?: (e: RunEvent) => void
-}): Promise<RunOutcome> {
-  const started = Date.now()
-  const budget = runBudget(input.mode)
-  const status: Partial<Record<StageName, StageStatus>> = {}
-  const gaps: string[] = []
-  const emit = (stage: StageName, s: RunEvent['status'], extra: Partial<RunEvent> = {}) =>
-    input.onEvent?.({ stage, status: s, at: new Date().toISOString(), ...extra })
+type Identity = NonNullable<ResolveOut['identity']>
 
-  /** Runs one stage, records its status and gaps, and reports progress. Never throws. */
-  async function stage<T extends { data: { gaps?: string[] }; dropped: string[]; searchCapped?: boolean }>(
-    name: StageName,
-    fn: () => Promise<T>,
-  ): Promise<T['data'] | null> {
-    emit(name, 'started')
-    try {
-      const r = await fn()
-      const s: StageStatus = r.searchCapped ? 'partial' : 'ok'
-      status[name] = s
-      if (r.searchCapped) gaps.push(`${name}: hit its search limit before finishing, so this section may be incomplete.`)
-      gaps.push(...(r.data.gaps ?? []), ...r.dropped)
-      emit(name, s, { output: r.data })
-      return r.data
-    } catch (e) {
-      status[name] = 'failed'
-      gaps.push(`${name} research did not complete: ${message(e)}`)
-      emit(name, 'failed', { error: message(e) })
-      return null
-    }
-  }
-
-  // Stages 0 and 1 gate everything: if they fail there is no company to report on, so they throw.
-  emit('parse', 'started')
-  const parsed = await parse(input.text, budget).catch((e) => (emit('parse', 'failed', { error: message(e) }), Promise.reject(e)))
-  status.parse = 'ok'
-  emit('parse', 'ok', { output: parsed })
-
-  emit('resolve', 'started')
-  const { out, dropped } = await resolve(parsed, budget, input.companyDomain).catch(
-    (e) => (emit('resolve', 'failed', { error: message(e) }), Promise.reject(e)),
-  )
-  const g = gate(out, input.companyDomain)
-  if (g === 'mismatch') {
-    const msg = out.identity
-      ? `you gave ${input.companyDomain}, but research resolved ${out.identity.domain}; check the domain`
-      : `could not source the identity of ${input.companyDomain} (legal name, HQ, public status):\n  ${[...out.gaps, ...dropped].join('\n  ')}`
-    emit('resolve', 'failed', { error: msg })
-    throw new Error(msg)
-  }
-  if (g === 'ask' || !out.identity) {
-    const reason = out.identity
-      ? `resolution confidence ${out.identity.resolution_confidence} is below 0.8`
-      : 'the top candidate could not be sourced well enough to confirm its identity'
-    emit('resolve', 'partial', { output: out })
-    return { kind: 'needs_choice', reason, candidates: out.candidates, gaps: [...out.gaps, ...dropped], budget }
-  }
-  const identity = out.identity
-  status.resolve = 'ok'
-  gaps.push(...out.gaps, ...dropped)
-  emit('resolve', 'ok', { output: out })
-
-  const run = (mode: 'triage' | 'deep') => ({
-    mode,
-    searches_used: budget.total.searches,
-    input_tokens: budget.total.input + budget.total.cacheRead + budget.total.cacheWrite,
-    output_tokens: budget.total.output,
-    cost_usd: Number(budget.total.usd.toFixed(4)),
-    duration_ms: Date.now() - started,
-    stage_status: status,
-  })
-  const partial = () => Object.values(status).some((s) => s !== 'ok')
-
-  if (input.mode === 'triage') {
-    const t = await stage('triage', () => triage(identity, budget))
-    const result: TriageResult = {
-      schema_version: 2,
-      generated_at: new Date().toISOString(),
-      partial: partial(),
-      identity,
-      role: parsed.role,
-      flags: t?.flags ?? [],
-      deep_dive: t?.deep_dive ?? { recommended: true, reason: 'The quick check did not complete, so nothing rules this company out yet.' },
-      gaps: unique(gaps),
-      run: run('triage'),
-    }
-    return { kind: 'triage', result, budget }
-  }
-
-  const [m, p] = await Promise.all([stage('money', () => money(identity, budget)), stage('people', () => people(identity, budget))])
-  const strip = <T extends { gaps: string[] }>({ gaps: _g, ...rest }: T) => rest
-  const draft: Draft = {
+/** The research so far, as stage 8 sees it. */
+export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; money: StageResult<MoneyOut>; people: StageResult<PeopleOut>; totals: Totals }): Draft {
+  const status = { parse: 'ok', resolve: 'ok', money: statusOf(p.money), people: statusOf(p.people) } as const
+  return {
     schema_version: 2,
     generated_at: new Date().toISOString(),
-    partial: partial(),
-    identity,
-    money: m ? strip(m) : EMPTY_MONEY,
-    people: p ? strip(p) : EMPTY_PEOPLE,
-    role: parsed.role,
-    gaps: unique(gaps),
-    run: run('deep'),
+    partial: Object.values(status).some((s) => s !== 'ok'),
+    identity: p.identity,
+    money: p.money.data ? strip(p.money.data) : EMPTY_MONEY,
+    people: p.people.data ? strip(p.people.data) : EMPTY_PEOPLE,
+    role: p.parsed.role,
+    gaps: unique([...p.resolveGaps, ...stageGaps('money', p.money), ...stageGaps('people', p.people)]),
+    run: runField('deep', p.totals, status),
   }
+}
 
-  const s = await stage('synthesize', () => synthesize({ draft, profile: input.profile }, budget))
-  const report: CompanyResearch = {
+export function assembleReport(draft: Draft, synth: StageResult<SynthOut>, totals: Totals): CompanyResearch {
+  const stage_status = { ...draft.run.stage_status, synthesize: statusOf(synth) }
+  const s = synth.data
+  return {
     ...draft,
-    partial: partial(),
+    partial: Object.values(stage_status).some((x) => x !== 'ok'),
     flags: s?.flags ?? [],
     scores: s?.scores ?? [],
     questions_to_ask: s?.questions_to_ask ?? [],
     verdict: s?.verdict ?? 'Synthesis did not complete, so there are no flags, scores or verdict. The sourced research below is still valid.',
     // Synthesis gaps are the curated, decision-relevant ones; stage notes and dropped claims follow.
-    gaps: unique([...(s?.gaps ?? []), ...gaps]),
-    run: run('deep'),
+    gaps: unique([...(s?.gaps ?? []), ...draft.gaps, ...(s ? synth.dropped : stageGaps('synthesize', synth))]),
+    run: runField('deep', totals, stage_status),
   }
-  return { kind: 'report', report, budget }
+}
+
+export function assembleTriage(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; triage: StageResult<TriageOut>; totals: Totals }): TriageResult {
+  const stage_status = { parse: 'ok', resolve: 'ok', triage: statusOf(p.triage) } as const
+  return {
+    schema_version: 2,
+    generated_at: new Date().toISOString(),
+    partial: stage_status.triage !== 'ok',
+    identity: p.identity,
+    role: p.parsed.role,
+    flags: (p.triage.data?.flags ?? []) as Flag[],
+    deep_dive: p.triage.data?.deep_dive ?? { recommended: true, reason: 'The quick check did not complete, so nothing rules this company out yet.' },
+    gaps: unique([...p.resolveGaps, ...stageGaps('triage', p.triage)]),
+    run: runField('triage', p.totals, stage_status),
+  }
+}
+
+/** Runs a stage and turns any failure into a result, so one stage failing degrades the report instead of killing it. */
+export async function settle<T>(fn: () => Promise<{ data: T; dropped: string[]; searchCapped?: boolean }>): Promise<StageResult<T>> {
+  try {
+    const r = await fn()
+    return { data: r.data, dropped: r.dropped, searchCapped: r.searchCapped ?? false }
+  } catch (e) {
+    return { data: null, dropped: [], searchCapped: false, error: message(e) }
+  }
+}
+
+/**
+ * The whole pipeline in one process (CLI and evals). The web app runs the same stages as a
+ * durable workflow (src/workflows/research.ts) built from the same helpers.
+ */
+export async function runResearch(input: {
+  text: string
+  mode: 'triage' | 'deep'
+  profile: Profile | null
+  companyDomain?: string
+  runId?: string | null
+  onEvent?: (e: RunEvent) => void | Promise<void>
+}): Promise<RunOutcome> {
+  const started = Date.now()
+  const budget = await runBudget(input.mode, input.runId ?? null)
+  const emit = async (stage: StageName, status: RunEvent['status'], extra: Partial<RunEvent> = {}) =>
+    input.onEvent?.({ stage, status, at: new Date().toISOString(), ...extra })
+  const totals = (): Totals => ({ spend: { ...budget.total }, durationMs: Date.now() - started })
+
+  async function stage<T>(name: StageName, fn: () => Promise<{ data: T; dropped: string[]; searchCapped?: boolean }>) {
+    await emit(name, 'started')
+    const r = await settle(fn)
+    await emit(name, statusOf(r), r.error ? { error: r.error } : { output: r.data })
+    return r
+  }
+
+  // Stages 0 and 1 gate everything: if they fail there is no company to report on, so they throw.
+  await emit('parse', 'started')
+  const parsed = await parse(input.text, budget).catch(async (e) => (await emit('parse', 'failed', { error: message(e) }), Promise.reject(e)))
+  await emit('parse', 'ok', { output: parsed })
+
+  await emit('resolve', 'started')
+  const { out, dropped } = await resolve(parsed, budget, input.companyDomain).catch(
+    async (e) => (await emit('resolve', 'failed', { error: message(e) }), Promise.reject(e)),
+  )
+  const g = gateOutcome(out, dropped, input.companyDomain)
+  if (g.kind === 'mismatch') {
+    await emit('resolve', 'failed', { error: g.message })
+    throw new Error(g.message)
+  }
+  if (g.kind === 'ask') {
+    await emit('resolve', 'partial', { output: out })
+    return { kind: 'needs_choice', reason: g.reason, candidates: g.candidates, gaps: g.gaps, budget }
+  }
+  await emit('resolve', 'ok', { output: out })
+
+  if (input.mode === 'triage') {
+    const t = await stage('triage', () => triage(g.identity, budget))
+    return { kind: 'triage', result: assembleTriage({ parsed, identity: g.identity, resolveGaps: g.gaps, triage: t, totals: totals() }), budget }
+  }
+
+  const [m, p] = await Promise.all([stage('money', () => money(g.identity, budget)), stage('people', () => people(g.identity, budget))])
+  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, money: m, people: p, totals: totals() })
+  const s = await stage('synthesize', () => synthesize({ draft, profile: input.profile }, budget))
+  return { kind: 'report', report: assembleReport(draft, s, totals()), budget }
 }

@@ -1,8 +1,6 @@
-import { mkdtempSync, readFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { Budget, BudgetExceeded, costUsd, monthSpend, runBudget } from './cost.js'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { useTestDb } from '../db/db'
+import { Budget, BudgetExceeded, costUsd, monthSpend, runBudget, runSpend } from './cost'
 
 const u = (input: number, output: number, searches = 0) => ({ input, output, cacheRead: 0, cacheWrite: 0, searches })
 
@@ -44,13 +42,38 @@ describe('Budget', () => {
 })
 
 describe('ledger', () => {
-  it('persists the month total after every charge', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'bc-')), 'spend.json')
-    expect(monthSpend(file)).toBe(0)
-    runBudget('deep', file).charge('money', 'claude-sonnet-5-5', u(1_000_000, 0))
-    const second = runBudget('deep', file)
-    second.charge('money', 'claude-sonnet-5-5', u(500_000, 0))
-    expect(monthSpend(file)).toBeCloseTo(3)
-    expect(Object.keys(JSON.parse(readFileSync(file, 'utf8')))[0]).toMatch(/^\d{4}-\d{2}$/)
+  beforeEach(async () => {
+    await useTestDb()
+  })
+
+  it('persists every charge, so the month total survives across runs and processes', async () => {
+    expect(await monthSpend()).toBe(0)
+    const a = await runBudget('deep', null)
+    a.charge('money', 'claude-sonnet-5-5', u(1_000_000, 0))
+    await a.flush()
+    const b = await runBudget('deep', null)
+    b.charge('money', 'claude-sonnet-5-5', u(500_000, 0))
+    await b.flush()
+    expect(await monthSpend()).toBeCloseTo(3)
+  })
+
+  it('a new budget for an existing run starts from what that run already spent', async () => {
+    const db = await useTestDb()
+    await db.query("insert into opportunities (id, owner_id, text) values ('o', '00000000-0000-0000-0000-000000000001', 't')")
+    await db.query("insert into runs (id, opportunity_id, owner_id, mode) values ('r', 'o', '00000000-0000-0000-0000-000000000001', 'deep')")
+    const first = await runBudget('deep', 'r')
+    first.charge('money', 'claude-sonnet-5-5', u(1000, 0, 7))
+    await first.flush()
+    const second = await runBudget('deep', 'r')
+    expect(second.remainingSearches).toBe(33)
+    expect(await runSpend('r')).toMatchObject({ searches: 7, stages: { money: { searches: 7 } } })
+  })
+
+  it('the monthly cap holds across separate budgets', async () => {
+    const a = await runBudget('deep', null)
+    a.charge('synthesize', 'claude-opus-5-5', u(0, 1_000_000)) // $20
+    await a.flush()
+    const next = await runBudget('triage', null)
+    expect(() => next.assertCanSpend()).toThrow(/monthly cap/)
   })
 })

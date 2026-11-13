@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest'
-import { Budget } from '../util/cost.js'
-import type { CompanyResearch } from '../types/research.js'
+import { Budget } from '../util/cost'
+import type { CompanyResearch } from '../types/research'
 
 const researchStage = vi.hoisted(() => vi.fn(async () => ({ data: { gaps: [] }, dropped: [], searchCapped: false })))
 const callStructured = vi.hoisted(() => vi.fn(async () => ({ data: { flags: [], scores: [], questions_to_ask: [], verdict: 'v', gaps: [] }, dropped: [] })))
-vi.mock('./shared.js', async (orig) => ({ ...(await orig<typeof import('./shared.js')>()), researchStage }))
-vi.mock('../llm/call.js', () => ({ callStructured, callResearch: vi.fn() }))
+vi.mock('./shared', async (orig) => ({ ...(await orig<typeof import('./shared')>()), researchStage }))
+vi.mock('../llm/call', () => ({ callStructured, callResearch: vi.fn() }))
 
-const { money, MoneyOut } = await import('./stage3-money.js')
-const { people, PeopleOut } = await import('./stage4-people.js')
-const { synthesize, SynthOut } = await import('./stage8-synthesize.js')
-const { triage, TriageOut } = await import('./stage-triage.js')
+const { money, MoneyOut } = await import('./stage3-money')
+const { people, PeopleOut } = await import('./stage4-people')
+const { synthesize, SynthOut } = await import('./stage8-synthesize')
+const { triage, TriageOut } = await import('./stage-triage')
 
 const budget = () => new Budget({ searchesPerRun: 40, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 })
 const company = { display_name: 'Example', domain: 'example.com' }
@@ -79,8 +79,8 @@ describe('large schemas', () => {
 
 describe('synthPrompt', () => {
   it('leaves out run bookkeeping, so equal research gives an equal prompt (and a cache hit)', async () => {
-    const { synthPrompt } = await import('./stage8-synthesize.js')
-    const { validReport } = await import('../test/fixtures.js')
+    const { synthPrompt } = await import('./stage8-synthesize')
+    const { validReport } = await import('../test/fixtures')
     const { flags: _f, scores: _s, questions_to_ask: _q, verdict: _v, ...draft } = validReport()
     const a = synthPrompt(draft, null)
     const b = synthPrompt({ ...draft, generated_at: '2030-01-01T00:00:00.000Z', run: { ...draft.run, duration_ms: 99, cost_usd: 9 } }, null)
@@ -91,12 +91,12 @@ describe('synthPrompt', () => {
 })
 
 it('triage asks for a recommendation addressed to the candidate', async () => {
-  const { triageTask } = await import('./stage-triage.js')
+  const { triageTask } = await import('./stage-triage')
   expect(triageTask).toMatch(/addressed to the candidate/i)
 })
 
 it('money extraction demands full units and a currency for any amount', async () => {
-  const { moneyTask } = await import('./stage3-money.js')
+  const { moneyTask } = await import('./stage3-money')
   expect(moneyTask).toMatch(/full units/i)
   expect(moneyTask).toContain('30000000')
   expect(moneyTask).toMatch(/no currency.*null/i)

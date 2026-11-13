@@ -1,11 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
-import { BudgetExceeded, type Budget } from '../util/cost.js'
-import type { StageName } from '../types/research.js'
-import { assertSearchSupported, send } from './client.js'
-import { validateSourced } from './evidence.js'
-import { webSearchTool } from './search.js'
+import { BudgetExceeded, type Budget } from '../util/cost'
+import type { StageName } from '../types/research'
+import { assertSearchSupported, send } from './client'
+import { validateSourced } from './evidence'
+import { webSearchTool } from './search'
 
 const MAX_RETRIES = 2
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'

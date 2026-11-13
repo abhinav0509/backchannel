@@ -1,10 +1,10 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import 'dotenv/config'
-import { runResearch } from '../src/pipeline/run.js'
-import { CompanyResearch } from '../src/types/research.js'
-import { check, get } from './assert.js'
-import { fixtures } from './fixtures/index.js'
+import { runResearch } from '../src/pipeline/run'
+import { CompanyResearch } from '../src/types/research'
+import { check, get } from './assert'
+import { fixtures } from './fixtures/index'
 
 // --only lets you re-run one company: every full eval run costs real money against the monthly cap.
 const { values } = parseArgs({ options: { only: { type: 'string' } } })

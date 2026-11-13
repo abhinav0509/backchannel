@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { slug } from './slug.js'
+import { slug } from './slug'
 
 describe('slug', () => {
   it('lowercases, joins with dashes and drops punctuation', () => expect(slug('Sonatype, Inc.', 'Lead Product Designer')).toBe('sonatype-inc-lead-product-designer'))

@@ -1,10 +1,8 @@
 import type { NextConfig } from 'next'
+import { withWorkflow } from 'workflow/next'
 
 const config: NextConfig = {
-  // The pipeline is plain Node ESM that imports './x.js' for './x.ts'.
-  webpack: (c) => {
-    c.resolve.extensionAlias = { '.js': ['.ts', '.tsx', '.js'] }
-    return c
-  },
+  // Database drivers stay as Node modules rather than being bundled (PGlite ships WASM).
+  serverExternalPackages: ['@electric-sql/pglite', 'postgres'],
 }
-export default config
+export default withWorkflow(config)

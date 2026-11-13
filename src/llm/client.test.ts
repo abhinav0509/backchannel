@@ -1,8 +1,6 @@
-import { mkdtempSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Budget } from '../util/cost.js'
+import { useTestDb } from '../db/db'
+import { Budget } from '../util/cost'
 
 const create = vi.hoisted(() => vi.fn())
 vi.mock('@anthropic-ai/sdk', () => ({
@@ -11,16 +9,16 @@ vi.mock('@anthropic-ai/sdk', () => ({
     models = { retrieve: async () => ({ capabilities: { server_tools: { web_search: { supported: true } } } }) }
   },
 }))
-const { send } = await import('./client.js')
+const { send } = await import('./client')
 
 const usage = { input_tokens: 1000, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, server_tool_use: { web_search_requests: 2 } }
 const reply = (text: string, stop = 'end_turn') => ({ model: 'claude-sonnet-5-5', stop_reason: stop, usage, content: [{ type: 'text', text }] })
 const budget = () => new Budget({ searchesPerRun: 40, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 })
 const params = { model: 'claude-sonnet-5-5', max_tokens: 100, messages: [{ role: 'user' as const, content: 'hi' }] }
 
-beforeEach(() => {
+beforeEach(async () => {
   create.mockReset()
-  process.env.BACKCHANNEL_CACHE_DIR = mkdtempSync(join(tmpdir(), 'bc-llm-'))
+  await useTestDb()
   delete process.env.BACKCHANNEL_FRESH
 })
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { claim, Flag } from '../types/research.js'
-import { stripUnretrieved, validateSourced } from './evidence.js'
+import { claim, Flag } from '../types/research'
+import { stripUnretrieved, validateSourced } from './evidence'
 
 const ev = (url: string) => ({
   url, title: 't', publisher: null, published_at: null,
@@ -65,7 +65,7 @@ describe('validateSourced', () => {
 
 describe('collectEvidenceUrls', () => {
   it('lists every evidence URL once, in document order', async () => {
-    const { collectEvidenceUrls } = await import('./evidence.js')
+    const { collectEvidenceUrls } = await import('./evidence')
     const v = { a: c('x', [GOOD]), b: [c('y', ['https://b.example/1', GOOD])], s: [{ evidence_urls: ['https://c.example/'] }] }
     expect(collectEvidenceUrls(v)).toEqual([GOOD, 'https://b.example/1', 'https://c.example/'])
   })

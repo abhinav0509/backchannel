@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { Budget } from '../util/cost.js'
-import { cacheKey, readCache, writeCache } from '../util/cache.js'
-import { log } from '../util/log.js'
-import type { StageName } from '../types/research.js'
+import type { Budget } from '../util/cost'
+import { cacheGet, cacheKey, cacheSet } from '../util/cache'
+import { log } from '../util/log'
+import type { StageName } from '../types/research'
 
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming
 type Block = Anthropic.Beta.BetaContentBlock
@@ -27,10 +27,8 @@ export async function assertSearchSupported(model: string): Promise<void> {
   if (!(await searchSupport.get(model))) throw new Error(`${model} does not support the web search tool`)
 }
 
-const cacheDir = () => process.env.BACKCHANNEL_CACHE_DIR ?? 'cache/llm'
-
 /**
- * The only place the SDK is called. Serves identical requests from the on-disk cache (set
+ * The only place the SDK is called. Serves identical requests from the database cache (set
  * BACKCHANNEL_FRESH=1 to bypass), enforces the budget before each request, charges usage after
  * it, and resumes server-tool turns that pause. Sonnet and Opus calls opt into server-side
  * refusal fallbacks; Haiku has none.
@@ -41,7 +39,7 @@ export async function send(
 ): Promise<Sent> {
   const key = cacheKey({ params, maxSearches: ctx.maxSearches })
   if (!process.env.BACKCHANNEL_FRESH) {
-    const hit = readCache<Omit<Sent, 'cached'>>(cacheDir(), key)
+    const hit = await cacheGet<Omit<Sent, 'cached'>>(key)
     if (hit) {
       log('llm_cache_hit', { stage: ctx.stage, model: params.model })
       return { ...hit, cached: true }
@@ -71,6 +69,7 @@ export async function send(
       searches: u.server_tool_use?.web_search_requests ?? 0,
     }
     const usd = ctx.budget.charge(ctx.stage, res.model, usage)
+    await ctx.budget.flush() // the spend is on record before anything else can fail
     searches += usage.searches
     content.push(...res.content)
     log('llm_call', { stage: ctx.stage, model: res.model, stop: res.stop_reason, ms: Date.now() - started, ...usage, usd })
@@ -86,6 +85,6 @@ export async function send(
   }
 
   const sent = { content, searchCapped, at }
-  writeCache(cacheDir(), key, sent)
+  await cacheSet(key, sent)
   return { ...sent, cached: false }
 }
