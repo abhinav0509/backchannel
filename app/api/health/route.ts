@@ -4,7 +4,21 @@ import { health } from '../../../src/server/auth'
 export const dynamic = 'force-dynamic'
 
 // Public on purpose: configuration names and kinds, and whether the database answers. Never values or data.
-export async function GET() {
+// shortcut: temporary diagnostic for a hang under parallel queries; remove once understood.
+async function probe(n: number) {
+  const db = await getDb()
+  const t0 = Date.now()
+  const one = (i: number) =>
+    Promise.race([
+      db.query('select $1::int as i', [i]).then(() => Date.now() - t0),
+      new Promise<string>((r) => setTimeout(() => r('timeout'), 8000)),
+    ]).catch((e: unknown) => String(e).slice(0, 80))
+  return Promise.all(Array.from({ length: n }, (_, i) => one(i)))
+}
+
+export async function GET(req: Request) {
+  const n = Number(new URL(req.url).searchParams.get('parallel'))
+  if (n > 0 && n <= 12) return Response.json({ parallel: await probe(n) })
   let database_reachable: true | string
   try {
     await (await getDb()).query('select 1')
