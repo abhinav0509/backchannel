@@ -71,3 +71,13 @@ describe('health', () => {
     expect(health({ DATABASE_URL: 'postgresql://postgres.abc:x@aws-0-ap-south-1.pooler.supabase.com:6543/postgres' }).database).toBe('supabase-pooler')
   })
 })
+
+describe('health: switch diagnosis', () => {
+  it('shows the raw AUTH_DISABLED value and lookalike names, so a typo is visible', async () => {
+    const { health } = await import('./auth')
+    const h = health({ VERCEL: '1', AUTH_DISABLE: 'true', 'AUTH_DISABLED ': 'true', BACKCHANNEL_OWNER: 'x', DATABASE_URL: 'postgres://u:SECRET@h/d' })
+    expect(h.auth_disabled).toBeNull()
+    expect(h.similar_names).toEqual(['AUTH_DISABLE', 'AUTH_DISABLED ', 'BACKCHANNEL_OWNER'])
+    expect(health({ AUTH_DISABLED: 'True' }).auth_disabled).toBe('True')
+  })
+})

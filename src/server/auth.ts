@@ -44,5 +44,12 @@ function databaseKind(url = ''): string {
 
 /** What a deployment is running with, for diagnosis. Names and kinds only: never a value. */
 export function health(env: Env = process.env) {
-  return { mode: authMode(env), missing: missingConfig(env), commit: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local', database: databaseKind(env.DATABASE_URL) }
+  return {
+    mode: authMode(env),
+    missing: missingConfig(env),
+    commit: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local',
+    database: databaseKind(env.DATABASE_URL),
+    auth_disabled: env.AUTH_DISABLED ?? null, // a non-secret switch, shown raw so a bad value is visible
+    similar_names: Object.keys(env).filter((k) => /AUTH_DIS|BACKCHANNEL/i.test(k)).sort(),
+  }
 }
