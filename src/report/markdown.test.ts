@@ -62,6 +62,12 @@ describe('toMarkdown', () => {
     expect(md).toContain('1. How did the 2023 cuts affect design?')
   })
 
+  it('never repeats a marker for the same source', () => {
+    const r = report()
+    r.flags[0]!.evidence = [ev(A), ev(A), ev(B)]
+    expect(toMarkdown(r)).toContain('severity 4) [1][2]')
+  })
+
   it('says none instead of leaving a section empty', () => expect(md).toMatch(/## Leadership changes\n\nNone found\./))
 })
 

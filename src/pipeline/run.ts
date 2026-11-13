@@ -136,7 +136,8 @@ export async function runResearch(input: {
     scores: s?.scores ?? [],
     questions_to_ask: s?.questions_to_ask ?? [],
     verdict: s?.verdict ?? 'Synthesis did not complete, so there are no flags, scores or verdict. The sourced research below is still valid.',
-    gaps: unique(gaps),
+    // Synthesis gaps are the curated, decision-relevant ones; stage notes and dropped claims follow.
+    gaps: unique([...(s?.gaps ?? []), ...gaps]),
     run: run('deep'),
   }
   return { kind: 'report', report, budget }

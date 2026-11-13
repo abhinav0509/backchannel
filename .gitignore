@@ -5,3 +5,6 @@ out/
 cache/
 *.log
 data/
+.next/
+next-env.d.ts
+*.tsbuildinfo

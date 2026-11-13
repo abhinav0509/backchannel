@@ -20,7 +20,7 @@ export function toMarkdown(r: CompanyResearch): string {
   }
   visit(r)
 
-  const refs = (urls: string[]) => (urls.length ? ' ' + urls.map((u) => `[${index.get(u)}]`).join('') : '')
+  const refs = (urls: string[]) => (urls.length ? ' ' + [...new Set(urls)].map((u) => `[${index.get(u)}]`).join('') : '')
   const claim = <T>(c: C<T> | null, show: (v: T) => string = String) =>
     c ? `${show(c.value)} (${c.confidence})${refs(c.evidence.map((e) => e.url))}` : 'Not established'
   const claims = <T>(cs: C<T>[], show: (v: T) => string) => list(cs.map((c) => claim(c, show)))
@@ -130,7 +130,7 @@ Run: ${Object.entries(run.stage_status).map(([k, v]) => `${k} ${v}`).join(', ')}
 
 export function triageToMarkdown(t: TriageResult): string {
   const index = new Map(collectEvidenceUrls(t).map((u, i) => [u, i + 1]))
-  const refs = (urls: string[]) => (urls.length ? ' ' + urls.map((u) => `[${index.get(u)}]`).join('') : '')
+  const refs = (urls: string[]) => (urls.length ? ' ' + [...new Set(urls)].map((u) => `[${index.get(u)}]`).join('') : '')
   const flags = t.flags.length
     ? [...t.flags].sort((a, b) => b.severity - a.severity).map((f) => `- ${f.polarity === 'risk' ? 'Risk' : 'Green'}: **${f.title}** (severity ${f.severity})${refs(f.evidence.map((e) => e.url))}\n  ${f.detail}`).join('\n')
     : 'None found.'

@@ -10,7 +10,10 @@
     "dev": "tsx src/cli.ts",
     "eval": "tsx evals/run-evals.ts",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web": "next dev --webpack -p 3210",
+    "build": "next build --webpack",
+    "start": "next start -p 3210"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.8.0",

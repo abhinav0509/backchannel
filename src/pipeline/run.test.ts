@@ -41,14 +41,14 @@ beforeEach(() => {
 })
 
 describe('deep run', () => {
-  it('produces a valid complete report with merged, de-duplicated gaps', async () => {
+  it('produces a valid complete report with de-duplicated gaps, synthesis gaps first', async () => {
     const o = await runResearch({ text: 't', mode: 'deep', profile: null })
     if (o.kind !== 'report') throw new Error(o.kind)
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report.partial).toBe(false)
     expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', money: 'ok', people: 'ok', synthesize: 'ok' })
     expect(o.report.money.ownership_type?.value).toBe('vc_backed')
-    expect(o.report.gaps).toEqual(['no revenue', 'no reviews', 'no comp'])
+    expect(o.report.gaps).toEqual(['no reviews', 'no comp', 'no revenue'])
   })
 
   it('runs money and people in parallel', async () => {
