@@ -13,3 +13,6 @@ AGENTS.md
 /.swc
 .data/
 .workflow-data/
+
+.env*
+!.env.example
