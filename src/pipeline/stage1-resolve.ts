@@ -1,9 +1,7 @@
 import { z } from 'zod'
-import { MODELS } from '../config.js'
-import { callResearch, callStructured } from '../llm/call.js'
 import { Domain, Identity } from '../types/research.js'
 import type { Budget } from '../util/cost.js'
-import { extractionPrompt, researchRules, today } from './shared.js'
+import { researchRules, researchStage, today } from './shared.js'
 import type { ParseOut } from './stage0-parse.js'
 
 export const RESOLVE_THRESHOLD = 0.8
@@ -44,28 +42,14 @@ requirements: ${p.role.extracted_requirements.slice(0, 8).join('; ') || '(none)'
 ${researchRules(MAX_SEARCHES)}`
 
 export async function resolve(p: ParseOut, budget: Budget, companyDomain?: string): Promise<{ out: ResolveOut; dropped: string[] }> {
-  const retrievedAt = new Date().toISOString()
-  const research = await callResearch({
+  const { data, dropped } = await researchStage({
     stage: 'resolve',
     budget,
-    model: MODELS.research,
     system: resolveSystem,
     prompt: resolvePrompt(p, companyDomain),
     maxSearches: MAX_SEARCHES,
-  })
-  const { data, dropped } = await callStructured({
-    stage: 'resolve',
-    budget,
-    model: MODELS.parse,
-    system: 'You convert cited research notes into JSON. You add nothing that is not in the notes.',
-    prompt: extractionPrompt({
-      task: `candidates: every plausible company named in the notes, most likely first. identity: the most likely candidate, with resolution_confidence equal to its confidence; null if the notes do not source its legal name, HQ and public status.${companyDomain ? ` The user confirmed the domain is ${companyDomain}.` : ''}`,
-      notes: research.notes,
-      sources: research.sources,
-      retrievedAt,
-    }),
+    task: `candidates: every plausible company named in the notes, most likely first. identity: the most likely candidate, with resolution_confidence equal to its confidence; null if the notes do not source its legal name, HQ and public status.${companyDomain ? ` The user confirmed the domain is ${companyDomain}.` : ''}`,
     schema: ResolveOut,
-    retrievedUrls: research.retrievedUrls,
   })
   return { out: data, dropped }
 }

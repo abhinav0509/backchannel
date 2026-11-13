@@ -11,7 +11,7 @@ export interface Fixture {
   input: string // relative to evals/fixtures/inputs/
   tests: string
   checked: boolean
-  outcome: 'report' | 'needs_choice'
+  outcome: 'report' | 'needs_choice' // evals always run in deep mode
   expect: Record<string, unknown>
 }
 

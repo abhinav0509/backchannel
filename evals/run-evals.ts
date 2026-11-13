@@ -25,13 +25,14 @@ for (const f of selected) {
   let target: unknown
   let cost = ''
   try {
-    const outcome = await runResearch({ text: readFileSync(inputPath, 'utf8') })
+    const outcome = await runResearch({ text: readFileSync(inputPath, 'utf8'), mode: 'deep', profile: null })
     if (outcome.kind !== f.outcome) throw new Error(`expected outcome ${f.outcome}, got ${outcome.kind}`)
     if (outcome.kind === 'report') {
       target = CompanyResearch.parse(outcome.report)
       cost = ` ($${outcome.report.run.cost_usd.toFixed(2)})`
     } else {
       target = outcome
+      cost = ` ($${outcome.budget.total.usd.toFixed(2)})`
     }
   } catch (err) {
     console.log(`FAIL       ${f.name}: ${err instanceof Error ? err.message : String(err)}`)

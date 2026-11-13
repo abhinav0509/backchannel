@@ -60,9 +60,9 @@ describe('CompanyResearch', () => {
     r.identity.domain = 'https://example.com'
     expect(CompanyResearch.safeParse(r).success).toBe(false)
   })
-  it('rejects fewer than six questions', () => {
+  it('rejects more than ten questions', () => {
     const r = research()
-    r.questions_to_ask = ['q1']
+    r.questions_to_ask = Array.from({ length: 11 }, (_, i) => `q${i}`)
     expect(CompanyResearch.safeParse(r).success).toBe(false)
   })
 })

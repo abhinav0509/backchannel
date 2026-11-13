@@ -8,6 +8,6 @@ export const MODELS = {
 // Hard limits, not warnings: on breach the run stops and returns a partial report.
 export const BUDGETS = {
   monthlyUsd: 20, // no new run starts once this month's recorded spend reaches it
-  triage: { searchesPerRun: 6, tokensPerRun: 120_000 },
+  triage: { searchesPerRun: 8, tokensPerRun: 200_000 },
   deep: { searchesPerRun: 40, tokensPerRun: 600_000 },
 } as const

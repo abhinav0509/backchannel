@@ -1,0 +1,13 @@
+{
+  "headline": "Senior product designer focused on AI and developer tools",
+  "years_experience": 8,
+  "current_level": "Senior",
+  "target_levels": ["Senior", "Lead", "Staff"],
+  "skills": ["interaction design", "design systems", "prototyping", "user research", "AI UX"],
+  "domains_of_interest": ["developer tools", "AI products", "security"],
+  "locations": ["Bengaluru", "Remote"],
+  "work_policy": "hybrid",
+  "constraints": ["no relocation outside India"],
+  "projects": [{ "name": "Example project", "summary": "Replace with a project you want matched against JD requirements." }],
+  "weights": { "role_fit": 30, "company_health": 15, "job_security": 20, "career_signal": 15, "culture": 10, "comp_confidence": 10 }
+}

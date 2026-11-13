@@ -34,6 +34,22 @@ export function stripUnretrieved(value: unknown, retrieved: Iterable<string>): s
   return [...removed]
 }
 
+/** Every URL in `evidence` and `evidence_urls` arrays, once each, in the order first met. */
+export function collectEvidenceUrls(value: unknown): string[] {
+  const urls = new Set<string>()
+  const walk = (v: unknown): void => {
+    if (Array.isArray(v)) return v.forEach(walk)
+    if (!isRec(v)) return
+    for (const [k, child] of Object.entries(v)) {
+      if (k === 'evidence' && Array.isArray(child)) for (const e of child) isRec(e) && typeof e.url === 'string' && urls.add(e.url)
+      else if (k === 'evidence_urls' && Array.isArray(child)) for (const u of child) typeof u === 'string' && urls.add(u)
+      else walk(child)
+    }
+  }
+  walk(value)
+  return [...urls]
+}
+
 type Path = readonly PropertyKey[]
 
 // Later array indices first, so splicing one item never shifts another we still have to drop.

@@ -62,3 +62,11 @@ describe('validateSourced', () => {
 
   it('reports invalid JSON', () => expect(validateSourced('{nope', Out)).toMatchObject({ ok: false }))
 })
+
+describe('collectEvidenceUrls', () => {
+  it('lists every evidence URL once, in document order', async () => {
+    const { collectEvidenceUrls } = await import('./evidence.js')
+    const v = { a: c('x', [GOOD]), b: [c('y', ['https://b.example/1', GOOD])], s: [{ evidence_urls: ['https://c.example/'] }] }
+    expect(collectEvidenceUrls(v)).toEqual([GOOD, 'https://b.example/1', 'https://c.example/'])
+  })
+})

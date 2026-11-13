@@ -77,12 +77,12 @@ export async function callResearch(o: {
   prompt: string
   maxSearches: number
   effort?: Effort
-}): Promise<{ notes: string; sources: Source[]; retrievedUrls: string[]; searchCapped: boolean }> {
+}): Promise<{ notes: string; sources: Source[]; retrievedUrls: string[]; searchCapped: boolean; at: string }> {
   const maxUses = Math.min(o.maxSearches, o.budget.remainingSearches)
   if (maxUses === 0) throw new BudgetExceeded('run search cap reached')
   await assertSearchSupported(o.model)
 
-  const { content, searchCapped } = await send(
+  const { content, searchCapped, at } = await send(
     {
       model: o.model,
       max_tokens: 16000,
@@ -112,5 +112,5 @@ export async function callResearch(o: {
       notes += ` [${s.n}]`
     }
   }
-  return { notes, sources: [...sources.values()], retrievedUrls: [...pageAge.keys()], searchCapped }
+  return { notes, sources: [...sources.values()], retrievedUrls: [...pageAge.keys()], searchCapped, at }
 }

@@ -97,7 +97,7 @@ export const Score = z.object({
 })
 
 export const StageName = z.enum([
-  'parse', 'resolve', 'business', 'money', 'people', 'market', 'local', 'role', 'synthesize',
+  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'local', 'role', 'synthesize',
 ])
 
 export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
@@ -122,6 +122,8 @@ export const Role = z.object({
   extracted_requirements: z.array(z.string()),
 })
 
+export const StageStatus = z.enum(['ok', 'partial', 'failed'])
+
 export const Run = z.object({
   mode: z.enum(['triage', 'deep']),
   searches_used: z.int().nonnegative(),
@@ -129,7 +131,7 @@ export const Run = z.object({
   output_tokens: z.int().nonnegative(),
   cost_usd: z.number().nonnegative(),
   duration_ms: z.int().nonnegative(),
-  stage_status: z.partialRecord(StageName, z.enum(['ok', 'partial', 'failed'])),
+  stage_status: z.partialRecord(StageName, StageStatus),
 })
 
 export const CompanyResearch = z.object({
@@ -159,7 +161,7 @@ export const CompanyResearch = z.object({
   role: Role,
   flags: z.array(Flag),
   scores: z.array(Score),
-  questions_to_ask: z.array(z.string()).min(6).max(10),
+  questions_to_ask: z.array(z.string()).max(10), // 6 to 10 enforced on stage 8 output; empty only if stage 8 failed
   verdict: z.string(),
   gaps: z.array(z.string()),
   run: Run,
@@ -187,5 +189,6 @@ export type FlagKind = z.infer<typeof FlagKind>
 export type Flag = z.infer<typeof Flag>
 export type Score = z.infer<typeof Score>
 export type StageName = z.infer<typeof StageName>
+export type StageStatus = z.infer<typeof StageStatus>
 export type CompanyResearch = z.infer<typeof CompanyResearch>
 export type TriageResult = z.infer<typeof TriageResult>

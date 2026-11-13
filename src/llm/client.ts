@@ -1,10 +1,17 @@
 import Anthropic from '@anthropic-ai/sdk'
 import type { Budget } from '../util/cost.js'
+import { cacheKey, readCache, writeCache } from '../util/cache.js'
 import { log } from '../util/log.js'
 import type { StageName } from '../types/research.js'
 
 type Params = Anthropic.Beta.MessageCreateParamsNonStreaming
 type Block = Anthropic.Beta.BetaContentBlock
+export interface Sent {
+  content: Block[]
+  searchCapped: boolean
+  at: string // when the API produced this content; preserved on cache hits
+  cached: boolean
+}
 
 let client: Anthropic | undefined
 const api = () => (client ??= new Anthropic())
@@ -20,18 +27,32 @@ export async function assertSearchSupported(model: string): Promise<void> {
   if (!(await searchSupport.get(model))) throw new Error(`${model} does not support the web search tool`)
 }
 
+const cacheDir = () => process.env.BACKCHANNEL_CACHE_DIR ?? 'cache/llm'
+
 /**
- * The only place the SDK is called. Enforces the budget before each request, charges usage
- * after it, resumes server-tool turns that pause, and returns every content block produced.
- * Sonnet and Opus calls opt into server-side refusal fallbacks; Haiku has none.
+ * The only place the SDK is called. Serves identical requests from the on-disk cache (set
+ * BACKCHANNEL_FRESH=1 to bypass), enforces the budget before each request, charges usage after
+ * it, and resumes server-tool turns that pause. Sonnet and Opus calls opt into server-side
+ * refusal fallbacks; Haiku has none.
  */
 export async function send(
   params: Omit<Params, 'betas' | 'fallbacks'>,
   ctx: { stage: StageName; budget: Budget; maxSearches?: number },
-): Promise<{ content: Block[]; searchCapped: boolean }> {
+): Promise<Sent> {
+  const key = cacheKey({ params, maxSearches: ctx.maxSearches })
+  if (!process.env.BACKCHANNEL_FRESH) {
+    const hit = readCache<Omit<Sent, 'cached'>>(cacheDir(), key)
+    if (hit) {
+      log('llm_cache_hit', { stage: ctx.stage, model: params.model })
+      return { ...hit, cached: true }
+    }
+  }
+
   const messages = [...params.messages]
   const content: Block[] = []
+  const at = new Date().toISOString()
   let searches = 0
+  let searchCapped = false
 
   for (;;) {
     ctx.budget.assertCanSpend()
@@ -55,10 +76,16 @@ export async function send(
     log('llm_call', { stage: ctx.stage, model: res.model, stop: res.stop_reason, ms: Date.now() - started, ...usage, usd })
 
     if (res.stop_reason === 'refusal') throw new RefusalError(`${ctx.stage}: model refused (${res.stop_details?.category ?? 'no category'})`)
-    if (res.stop_reason !== 'pause_turn') return { content, searchCapped: false }
+    if (res.stop_reason !== 'pause_turn') break
     // A paused server-tool turn resumes by resending it unchanged. Stop instead once the stage's searches are spent.
-    if (ctx.maxSearches !== undefined && (searches >= ctx.maxSearches || ctx.budget.remainingSearches === 0))
-      return { content, searchCapped: true }
+    if (ctx.maxSearches !== undefined && (searches >= ctx.maxSearches || ctx.budget.remainingSearches === 0)) {
+      searchCapped = true
+      break
+    }
     messages.push({ role: 'assistant', content: res.content })
   }
+
+  const sent = { content, searchCapped, at }
+  writeCache(cacheDir(), key, sent)
+  return { ...sent, cached: false }
 }

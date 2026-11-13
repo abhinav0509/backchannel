@@ -1,4 +1,8 @@
-import type { Source } from '../llm/call.js'
+import type { z } from 'zod'
+import { MODELS } from '../config.js'
+import { callResearch, callStructured, type Source } from '../llm/call.js'
+import type { StageName } from '../types/research.js'
+import type { Budget } from '../util/cost.js'
 
 export const today = () => new Date().toISOString().slice(0, 10)
 
@@ -33,4 +37,41 @@ ${o.notes}
 
 SOURCES
 ${list || '(none)'}`
+}
+
+/** Identifies the company in every research prompt, and guards against same-name results. */
+export const companyLine = (c: { display_name: string; domain: string }) =>
+  `${c.display_name} (website ${c.domain}). Searches often return companies with a similar name; use only sources that are about the company at ${c.domain}, and ignore the rest.`
+
+/**
+ * A research stage in two calls: the research model searches and writes cited notes, then the
+ * cheap model converts them to the stage schema with the retrieved URLs as the evidence allow-list.
+ */
+export async function researchStage<S extends z.ZodType>(o: {
+  stage: StageName
+  budget: Budget
+  system: string
+  prompt: string
+  maxSearches: number
+  task: string
+  schema: S
+}): Promise<{ data: z.output<S>; dropped: string[]; searchCapped: boolean }> {
+  const research = await callResearch({
+    stage: o.stage,
+    budget: o.budget,
+    model: MODELS.research,
+    system: o.system,
+    prompt: o.prompt,
+    maxSearches: o.maxSearches,
+  })
+  const { data, dropped } = await callStructured({
+    stage: o.stage,
+    budget: o.budget,
+    model: MODELS.parse,
+    system: 'You convert cited research notes into JSON. You add nothing that is not in the notes.',
+    prompt: extractionPrompt({ task: o.task, notes: research.notes, sources: research.sources, retrievedAt: research.at }),
+    schema: o.schema,
+    retrievedUrls: research.retrievedUrls,
+  })
+  return { data, dropped, searchCapped: research.searchCapped }
 }
