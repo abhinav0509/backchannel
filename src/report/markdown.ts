@@ -3,6 +3,10 @@ import type { CompanyResearch, EvidenceRef, Flag, Score, TriageResult } from '..
 
 type C<T> = { value: T; confidence: string; evidence: EvidenceRef[] }
 
+/** 'Lead' + 'Lead Product Designer' must not read 'Lead Lead Product Designer'. */
+export const roleTitle = (level: string | null, title: string) =>
+  level && !title.toLowerCase().split(/\s+/).includes(level.toLowerCase()) ? `${level} ${title}` : title
+
 const label = (s: string) => s.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase())
 const num = (n: number) => n.toLocaleString('en-US')
 const list = (items: string[]) => (items.length ? items.map((i) => `- ${i}`).join('\n') : 'None found.')
@@ -85,7 +89,7 @@ ${r.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n') || 'None generat
 
 ### Funding events
 
-${claims(money.funding_events, (f) => [f.date, f.round, f.amount !== null ? `${num(f.amount)} ${f.currency ?? ''}`.trim() : null, f.investors.length ? `investors: ${f.investors.join(', ')}` : null].filter(Boolean).join(', '))}
+${claims(money.funding_events, (f) => [f.date, f.round, f.amount !== null && f.currency ? `${num(f.amount)} ${f.currency}` : null, f.investors.length ? `investors: ${f.investors.join(', ')}` : null].filter(Boolean).join(', '))}
 
 ### Exit activity
 
@@ -110,7 +114,7 @@ ${claims(people.review_scores, (s) => `${s.source}: ${s.score}/${s.scale}${s.sam
 
 ## Role
 
-- ${[role.level_claimed, role.title].filter(Boolean).join(' ')}, ${role.location ?? 'location not stated'}, ${role.work_policy}, ${role.employment_type}
+- ${roleTitle(role.level_claimed, role.title)}, ${role.location ?? 'location not stated'}, ${role.work_policy}, ${role.employment_type}
 ${role.extracted_requirements.map((q) => `- ${q}`).join('\n')}
 
 ## What we could not establish

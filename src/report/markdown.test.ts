@@ -56,6 +56,12 @@ describe('toMarkdown', () => {
     expect(md).toMatch(/Fits interests.*from your profile/)
   })
 
+  it('never shows an amount without its currency', () => {
+    const r = report()
+    r.money.funding_events = [c({ date: '2016', round: 'Series C', amount: 30, currency: null, investors: [] }, [B])]
+    expect(toMarkdown(r)).not.toMatch(/Series C, 30/)
+  })
+
   it('formats money as reported and lists gaps and questions', () => {
     expect(md).toContain('50,000,000 USD')
     expect(md).toContain('- Compensation could not be established.')
@@ -85,5 +91,15 @@ describe('triageToMarkdown', () => {
     expect(md).toContain('Cut 10% in 2023')
     expect(md).toContain('- Thin coverage.')
     expect(md).toContain('$0.21')
+  })
+})
+
+describe('roleTitle', () => {
+  it('prefixes the level only when the title does not already say it', async () => {
+    const { roleTitle } = await import('./markdown.js')
+    expect(roleTitle('Lead', 'Lead Product Designer')).toBe('Lead Product Designer')
+    expect(roleTitle('Senior', 'Product Designer')).toBe('Senior Product Designer')
+    expect(roleTitle(null, 'Designer')).toBe('Designer')
+    expect(roleTitle('lead', 'Design Lead')).toBe('Design Lead')
   })
 })

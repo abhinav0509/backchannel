@@ -22,7 +22,7 @@ Establish:
 
 ${researchRules(MAX_SEARCHES)}`
 
-export const moneyTask = `ownership_type: one of public, pe_backed, vc_backed, bootstrapped, subsidiary, unknown; null if no source states it. funding_events: one claim per event; amount and currency as reported, never converted. revenue_signal, profitability: a short sentence each, or null. exit_activity: one claim per sale process, IPO signal or acquisition.`
+export const moneyTask = `ownership_type: one of public, pe_backed, vc_backed, bootstrapped, subsidiary, unknown; null if no source states it. funding_events: one claim per event; amount in full units as reported ("$30 million" is 30000000), with its ISO currency, never converted; if a source gives no currency, amount is null and the gap says so. revenue_signal, profitability: a short sentence each, or null. exit_activity: one claim per sale process, IPO signal or acquisition.`
 
 // constrained: false because this schema exceeds the API's structured-output grammar limit (400, probed 2026-11-13).
 export async function money(c: { display_name: string; domain: string }, budget: Budget) {

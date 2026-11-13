@@ -94,3 +94,10 @@ it('triage asks for a recommendation addressed to the candidate', async () => {
   const { triageTask } = await import('./stage-triage.js')
   expect(triageTask).toMatch(/addressed to the candidate/i)
 })
+
+it('money extraction demands full units and a currency for any amount', async () => {
+  const { moneyTask } = await import('./stage3-money.js')
+  expect(moneyTask).toMatch(/full units/i)
+  expect(moneyTask).toContain('30000000')
+  expect(moneyTask).toMatch(/no currency.*null/i)
+})

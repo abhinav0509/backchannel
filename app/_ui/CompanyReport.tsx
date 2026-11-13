@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { CompanyResearch, EvidenceRef } from '../../src/types/research'
+import { roleTitle } from '../../src/report/markdown'
 import { ownershipLabel } from '../_lib/format'
 import { Gaps } from './Decision'
 import { Cites, Confidence } from './Evidence'
@@ -93,7 +94,7 @@ export function CompanyReport({ r }: { r: CompanyResearch }) {
             <>
               <span className="font-medium">{f.round ?? 'Event'}</span>
               <span className="text-ink-2">, {when(f.date)}</span>
-              {f.amount !== null && <span className="tabular-nums text-ink-2">, {n(f.amount)} {f.currency}</span>}
+              {f.amount !== null && f.currency && <span className="tabular-nums text-ink-2">, {n(f.amount)} {f.currency}</span>}
               {f.investors.length > 0 && <span className="block t-small text-ink-3">{f.investors.join(', ')}</span>}
             </>
           )}
@@ -172,7 +173,7 @@ export function CompanyReport({ r }: { r: CompanyResearch }) {
       <Section title="The role">
         <dl className="border-t border-line-soft">
           {[
-            ['Title', [role.level_claimed, role.title].filter(Boolean).join(' ')],
+            ['Title', roleTitle(role.level_claimed, role.title)],
             ['Location', role.location ?? 'Not stated'],
             ['Work policy', role.work_policy === 'unknown' ? 'Not stated' : role.work_policy],
             ['Employment', role.employment_type === 'unknown' ? 'Not stated' : role.employment_type],
