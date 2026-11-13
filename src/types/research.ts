@@ -100,10 +100,12 @@ export const StageName = z.enum([
   'parse', 'resolve', 'business', 'money', 'people', 'market', 'local', 'role', 'synthesize',
 ])
 
+export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
+
 export const Identity = z.object({
   legal_name: claim(z.string()),
   display_name: z.string(),
-  domain: z.string().regex(/^(?!-)[a-z0-9-]+(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com'),
+  domain: Domain,
   hq: claim(z.string()),
   founded_year: claim(z.int().min(1600).max(2100)).nullable(),
   is_public: claim(z.boolean()),
