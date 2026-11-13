@@ -32,6 +32,7 @@ export const Opportunity = z.object({
   role: z.string().nullable(),
   domain: z.string().nullable(),
   status: z.enum(['idle', 'running', 'needs_choice', 'done', 'failed']),
+  runner_pid: z.int().nullable().default(null), // the process running research: the web server or a CLI
   candidates: z.array(Candidate),
   choice_reason: z.string().nullable(),
   error: z.string().nullable(),
@@ -67,6 +68,7 @@ export function createOpportunity(text: string): Opportunity {
     role: null,
     domain: null,
     status: 'idle',
+    runner_pid: null,
     candidates: [],
     choice_reason: null,
     error: null,

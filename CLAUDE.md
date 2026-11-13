@@ -5,7 +5,10 @@ due-diligence report on the company.
 
 ## Current phase
 
-Phase 0: CLI only. No UI, no database, no web framework. If a task seems to need one, ask first.
+Phase 0 pipeline plus a local Phase 1 web app (Next.js in `app/`). Storage is JSON on disk in
+`data/` behind `src/store/store.ts`; runs execute in-process via `src/store/runner.ts`. Supabase and
+Inngest (PRD section 10) replace those two files when this needs hosting; nothing else should change.
+Work test-first: write the failing test, then the code.
 
 ## Principles that override convenience
 
@@ -28,7 +31,11 @@ Phase 0: CLI only. No UI, no database, no web framework. If a task seems to need
 - Every LLM call goes through `llm/call.ts`. No direct SDK calls from stage files.
 - Prompts live in the stage file they belong to, as exported template functions. Not in a prompts/
   folder, not in the database, not inline in the middle of logic.
-- Cache by `(company_domain, stage, prompt_hash)`. A prompt change invalidates its own cache only.
+- Every API request is cached by a hash of the full request (`llm/client.ts`), which carries the
+  domain, stage prompt and date. A prompt change invalidates its own entries only. `--fresh` bypasses.
+- Search uses `web_search_20250305` on purpose: newer versions returned text without citations.
+- Money and people extraction runs unconstrained (`constrained: false`): their schemas exceed the
+  API's structured-output grammar limit.
 - Log structured JSON to stderr, human-readable summary to stdout.
 
 ## Testing
@@ -41,15 +48,16 @@ Phase 0: CLI only. No UI, no database, no web framework. If a task seems to need
 
 ## Commands
 
-- `npm run dev -- research --file <path>` run on a file
-- `npm run dev -- research --text "<jd text>"` run on pasted text
+- `npm run web` the app at http://localhost:3210
+- `npm run dev -- research --file <path>` quick check from the terminal (add `--deep` for full research)
+- `npm test` unit tests (vitest)
 - `npm run eval` run the eval set
 - `npm run typecheck`
 
 ## What not to do
 
 - Do not add dependencies without asking.
-- Do not add Phase 1 features (web UI, Supabase, Inngest) in Phase 0.
+- UI motion: ease-out, under 250ms, only in response to an action or to show progress. Respect reduced motion.
 - Do not widen a type to make an error go away. Fix the shape or ask.
 - Do not silently retry past the configured limit.
 - Do not write a fact into a prompt as an example that could be mistaken for ground truth.

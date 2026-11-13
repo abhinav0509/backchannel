@@ -46,11 +46,11 @@ function Row({ o }: { o: Summary }) {
         href={`/o/${o.id}`}
         className="group -mx-3 grid grid-cols-[1fr_auto] items-start gap-x-6 gap-y-1 rounded-xl px-3 py-4 transition-colors duration-150 hover:bg-sunken/70 sm:grid-cols-[minmax(0,15rem)_1fr_auto]"
       >
-        <div className="min-w-0">
+        <div className="col-start-1 row-start-1 min-w-0">
           <p className="truncate font-semibold tracking-[-0.022em]">{o.company ?? 'Reading the email…'}</p>
           <p className="truncate t-small text-ink-2">{o.role ?? ' '}</p>
         </div>
-        <div className="col-span-2 row-start-2 min-w-0 sm:col-span-1 sm:row-start-1">
+        <div className="col-span-2 col-start-1 row-start-2 min-w-0 sm:col-span-1 sm:col-start-2 sm:row-start-1">
           <Status o={o} />
           {o.flags.length > 0 && (
             <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 t-micro text-ink-2">
@@ -63,7 +63,7 @@ function Row({ o }: { o: Summary }) {
             </p>
           )}
         </div>
-        <div className="flex flex-col items-end gap-1.5">
+        <div className="col-start-2 row-start-1 flex flex-col items-end gap-1.5 sm:col-start-3">
           <ScoreGlyph scores={o.scores} />
           <span className="t-micro text-ink-3">{age(o.created_at)}</span>
         </div>

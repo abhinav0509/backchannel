@@ -55,6 +55,12 @@ describe('CompanyResearch', () => {
     r.identity.hq.evidence = []
     expect(CompanyResearch.safeParse(r).success).toBe(false)
   })
+  it('accepts identity facts that could not be sourced, as null, so a known company is not blocked', () => {
+    const r = research()
+    Object.assign(r.identity, { legal_name: null, hq: null, is_public: null })
+    expect(CompanyResearch.safeParse(r).success).toBe(true)
+  })
+
   it('rejects a domain with a scheme', () => {
     const r = research()
     r.identity.domain = 'https://example.com'

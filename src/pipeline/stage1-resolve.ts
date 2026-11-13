@@ -17,7 +17,7 @@ export type Candidate = z.infer<typeof Candidate>
 
 export const ResolveOut = z.object({
   candidates: z.array(Candidate),
-  identity: Identity.nullable(), // the most likely company, null if none could be sourced
+  identity: Identity.nullable(), // the most likely company; null only when there is no candidate at all
   gaps: z.array(z.string()),
 })
 export type ResolveOut = z.infer<typeof ResolveOut>
@@ -48,11 +48,14 @@ export async function resolve(p: ParseOut, budget: Budget, companyDomain?: strin
     system: resolveSystem,
     prompt: resolvePrompt(p, companyDomain),
     maxSearches: MAX_SEARCHES,
-    task: `candidates: every plausible company named in the notes, most likely first. identity: the most likely candidate, with resolution_confidence equal to its confidence; null if the notes do not source its legal name, HQ and public status.${companyDomain ? ` The user confirmed the domain is ${companyDomain}.` : ''}`,
+    task: resolveTask(companyDomain),
     schema: ResolveOut,
   })
   return { out: data, dropped }
 }
+
+export const resolveTask = (companyDomain?: string) =>
+  `candidates: every plausible company named in the notes, most likely first; reason: one plain sentence a person can read, saying what matches or does not, with no [n] markers and no comment on the confidence number. identity: the most likely candidate, with resolution_confidence equal to its confidence; identity is null only if there is no candidate at all. Within identity, set legal_name, hq, founded_year or is_public to null when no quote states it, and say so in gaps.${companyDomain ? ` The user confirmed the domain is ${companyDomain}.` : ''}`
 
 /** The gate. Below the threshold the run stops and the user picks; a user-supplied domain must match what was resolved. */
 export function gate(out: ResolveOut, companyDomain?: string): 'pass' | 'ask' | 'mismatch' {

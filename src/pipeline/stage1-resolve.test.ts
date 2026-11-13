@@ -17,3 +17,10 @@ describe('gate', () => {
   it('passes a user-chosen domain that matches, whatever the confidence', () => expect(gate(out(0.3), 'example.com')).toBe('pass'))
   it('flags a user-chosen domain that research did not land on', () => expect(gate(out(0.95), 'other.com')).toBe('mismatch'))
 })
+
+it('the extraction task keeps identity whenever a candidate exists, nulling only unsourced facts', async () => {
+  const { resolveTask } = await import('./stage1-resolve.js')
+  expect(resolveTask()).toMatch(/null only if there is no candidate/i)
+  expect(resolveTask('example.com')).toContain('example.com')
+  expect(resolveTask()).toMatch(/reason: one plain sentence.*no \[n\] markers/i)
+})

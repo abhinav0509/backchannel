@@ -7,7 +7,9 @@ const DOMAIN = /^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/
 
 /** The one interruption in the flow: the point where a wrong guess would poison everything after it. */
 export function Choice({ o, onChoose }: { o: Opportunity; onChoose: (domain: string) => void }) {
-  const [picked, setPicked] = useState<string>(o.candidates[0]?.domain ?? '')
+  // Nothing is preselected unless research is fairly sure: this is the one place a guess must be the user's.
+  const top = o.candidates[0]
+  const [picked, setPicked] = useState<string>(top && top.confidence >= 0.6 ? top.domain : '')
   const [other, setOther] = useState('')
   const typed = other.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
   const domain = typed || picked

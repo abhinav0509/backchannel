@@ -91,8 +91,21 @@ describe('startRun', () => {
 })
 
 describe('reconcile', () => {
-  it('marks a run left running by a previous server process as interrupted', () => {
-    const o = { ...createOpportunity('x'), status: 'running' as const }
-    expect(reconcile(o)).toMatchObject({ status: 'failed', error: expect.stringMatching(/interrupted/) })
+  it('marks a run whose process has exited as interrupted', () => {
+    const o = { ...createOpportunity('x'), status: 'running' as const, runner_pid: 2 ** 22 + 12345 }
+    expect(reconcile(o, () => false)).toMatchObject({ status: 'failed', error: expect.stringMatching(/interrupted/) })
+  })
+
+  it('leaves a run alone while another live process (the CLI) is running it', () => {
+    const o = { ...createOpportunity('x'), status: 'running' as const, runner_pid: process.ppid } // a live process that is not this one
+    expect(reconcile(o, () => false).status).toBe('running')
+  })
+
+  it('records the runner pid when a run starts', async () => {
+    runResearch.mockResolvedValueOnce({ kind: 'triage', result: validTriage(), budget: budget() })
+    const o = createOpportunity('x')
+    const p = startRun(o.id, { mode: 'triage' })
+    expect(getOpportunity(o.id)?.runner_pid).toBe(process.pid)
+    await p
   })
 })

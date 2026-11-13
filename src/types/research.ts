@@ -102,13 +102,15 @@ export const StageName = z.enum([
 
 export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
 
+// Which company this is (domain, confidence) gates the run; the facts about it may be unsourced
+// (null, with the reason in gaps) without blocking research on a company we have identified.
 export const Identity = z.object({
-  legal_name: claim(z.string()),
+  legal_name: claim(z.string()).nullable(),
   display_name: z.string(),
   domain: Domain,
-  hq: claim(z.string()),
+  hq: claim(z.string()).nullable(),
   founded_year: claim(z.int().min(1600).max(2100)).nullable(),
-  is_public: claim(z.boolean()),
+  is_public: claim(z.boolean()).nullable(),
   resolution_confidence: z.number().min(0).max(1),
 })
 

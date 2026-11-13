@@ -51,6 +51,7 @@ export function startRun(id: string, opts: { mode: 'triage' | 'deep'; companyDom
   updateOpportunity(id, (d) => ({
     ...d,
     status: 'running',
+    runner_pid: process.pid,
     error: null,
     events: [],
     runs: [
@@ -88,9 +89,20 @@ export function startRun(id: string, opts: { mode: 'triage' | 'deep'; companyDom
   return work
 }
 
-/** A run marked running that this process is not executing was cut off by a server restart. */
+function alive(pid: number | null): boolean {
+  if (pid === null) return false
+  try {
+    process.kill(pid, 0) // signal 0 only checks the process exists
+    return true
+  } catch (e) {
+    return (e as NodeJS.ErrnoException).code === 'EPERM' // exists, owned by someone else
+  }
+}
+
+/** A run marked running whose process is gone (a restarted server, a killed CLI) was cut off. */
 export function reconcile(o: Opportunity, running: (id: string) => boolean = isActive): Opportunity {
-  return o.status === 'running' && !running(o.id)
+  const elsewhere = o.runner_pid !== null && o.runner_pid !== process.pid && alive(o.runner_pid)
+  return o.status === 'running' && !running(o.id) && !elsewhere
     ? { ...o, status: 'failed', error: 'The run was interrupted because the server restarted. Start it again.' }
     : o
 }
