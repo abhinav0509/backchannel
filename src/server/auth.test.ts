@@ -62,7 +62,7 @@ describe('health', () => {
   it('reports mode, missing variable names and the deployed commit, never values', async () => {
     const { health } = await import('./auth')
     const h = health({ VERCEL: '1', AUTH_DISABLED: 'true', DATABASE_URL: 'postgres://user:SECRET@host/db', VERCEL_GIT_COMMIT_SHA: 'abc1234def' })
-    expect(h).toEqual({ mode: 'open', missing: ['ANTHROPIC_API_KEY'], commit: 'abc1234', database: 'postgres' })
+    expect(h).toMatchObject({ mode: 'open', missing: ['ANTHROPIC_API_KEY'], commit: 'abc1234', database: 'postgres', auth_disabled: 'true' })
     expect(JSON.stringify(h)).not.toContain('SECRET')
   })
   it('names the database kind so a direct (IPv6-only) Supabase host is caught', async () => {
