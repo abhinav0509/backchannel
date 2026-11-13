@@ -79,7 +79,7 @@ export function ProfileForm({ initial }: { initial: Profile | null }) {
           <input id="headline" required value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Senior product designer, AI and developer tools" className={field} />
         </Field>
         <Field id="years" label="Years of experience">
-          <input id="years" required inputMode="decimal" value={years} onChange={(e) => setYears(e.target.value.replace(/[^\d.]/g, ''))} className={`${field} w-28 tabular-nums`} />
+          <input id="years" required inputMode="decimal" value={years} onChange={(e) => setYears(e.target.value.replace(/[^\d.]/g, ''))} className={`${field.replace("w-full", "")} w-28 tabular-nums`} />
         </Field>
         <Field id="level" label="Current level" hint="And the levels you would move to.">
           <input id="level" value={level} onChange={(e) => setLevel(e.target.value)} placeholder="Senior" className={field} />
