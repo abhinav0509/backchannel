@@ -109,3 +109,15 @@ describe('reconcile', () => {
     await p
   })
 })
+
+it('shares active-run state across separate copies of the module (Next bundles each route apart)', async () => {
+  let finish!: () => void
+  runResearch.mockImplementationOnce(() => new Promise((r) => (finish = () => r({ kind: 'triage', result: validTriage(), budget: budget() }))))
+  const o = createOpportunity('x')
+  const p = startRun(o.id, { mode: 'triage' })
+  vi.resetModules()
+  const other = await import('./runner.js')
+  expect(other.isActive(o.id)).toBe(true)
+  finish()
+  await p
+})

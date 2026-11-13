@@ -2,13 +2,14 @@
 
 import { useState } from 'react'
 import type { CompanyResearch, Flag, Score } from '../../src/types/research'
-import { DIMENSION_ORDER, dimensionLabel, flagLabel } from '../_lib/format'
+import { DIMENSION_ORDER, dimensionLabel, flagLabel, splitLead } from '../_lib/format'
 import { Cites } from './Evidence'
 
 export function Decision({ r }: { r: CompanyResearch }) {
   const risks = r.flags.filter((f) => f.polarity === 'risk').sort((a, b) => b.severity - a.severity)
   const greens = r.flags.filter((f) => f.polarity === 'green').sort((a, b) => b.severity - a.severity)
   const scores = DIMENSION_ORDER.flatMap((d) => r.scores.find((s) => s.dimension === d) ?? [])
+  const [lead, rest] = splitLead(r.verdict)
 
   return (
     <div className="space-y-16">
@@ -22,7 +23,8 @@ export function Decision({ r }: { r: CompanyResearch }) {
         <h2 id="verdict" className="sr-only">
           Verdict
         </h2>
-        <p className="t-lede max-w-[62ch] text-ink">{r.verdict}</p>
+        <p className="t-lede max-w-[34ch] font-semibold tracking-[-0.026em] text-ink sm:max-w-[40ch]">{lead}</p>
+        {rest && <p className="mt-4 max-w-[64ch] text-ink-2">{rest}</p>}
       </section>
 
       {scores.length > 0 && (

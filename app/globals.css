@@ -213,7 +213,8 @@ html {
   }
 }
 .fill-in {
-  animation: fill-in 320ms var(--ease-out) both;
+  /* backwards, not both: a transform left on after the animation would trap fixed-position children */
+  animation: fill-in 320ms var(--ease-out) backwards;
 }
 .meter {
   transition: width 600ms var(--ease-out);

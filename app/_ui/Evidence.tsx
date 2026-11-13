@@ -1,6 +1,8 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { cleanQuote } from '../_lib/format'
 import type { Source } from '../_lib/sources'
 
 export const SourcesContext = createContext<Map<string, Source>>(new Map())
@@ -82,7 +84,10 @@ function Marker({ url, source }: { url: string; source: Source }) {
       >
         {source.n}
       </button>
-      {open && pos && (
+      {open &&
+        pos &&
+        // Portalled: markers sit inside paragraphs, and a dialog may not nest in a <p>.
+        createPortal(
         <div
           ref={panel}
           id={id}
@@ -91,7 +96,7 @@ function Marker({ url, source }: { url: string; source: Source }) {
           className="pop fixed z-50 w-[min(340px,calc(100vw-32px))] rounded-2xl border border-line-soft bg-surface p-4 text-left shadow-[0_12px_40px_-12px_rgba(0,0,0,0.28),0_2px_6px_-2px_rgba(0,0,0,0.08)]"
           style={{ top: pos.top, left: pos.left, transformOrigin: pos.origin, translate: pos.origin.endsWith('bottom') ? '0 -100%' : undefined }}
         >
-          {ref?.snippet && <p className="t-small text-ink">“{ref.snippet.trim()}”</p>}
+          {ref?.snippet && <p className="t-small text-ink">“{cleanQuote(ref.snippet)}”</p>}
           <div className={`${ref?.snippet ? 'mt-3 border-t border-line-soft pt-3' : ''} t-micro text-ink-3`}>
             <p className="font-medium text-ink-2">{ref?.publisher ?? host}</p>
             <p className="mt-0.5">
@@ -102,8 +107,9 @@ function Marker({ url, source }: { url: string; source: Source }) {
           <a href={url} target="_blank" rel="noreferrer" className="mt-3 inline-block t-small font-medium text-accent hover:underline">
             Open {host}
           </a>
-        </div>
-      )}
+        </div>,
+          document.body,
+        )}
     </>
   )
 }

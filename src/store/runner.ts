@@ -7,7 +7,10 @@ import { getOpportunity, updateOpportunity, type Opportunity, type RunRecord } f
 
 // shortcut: runs execute inside the web server process and are tracked in memory, which works
 // for one person on `next dev` / `next start`. Move to Inngest (PRD section 10) when hosted.
-const active = new Map<string, Promise<void>>()
+// On globalThis because Next bundles each route separately: a module-level Map would give each
+// route its own copy, and one route could not see a run another started.
+const g = globalThis as typeof globalThis & { __backchannelActive?: Map<string, Promise<void>> }
+const active = (g.__backchannelActive ??= new Map<string, Promise<void>>())
 export const isActive = (id: string) => active.has(id)
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e))

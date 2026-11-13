@@ -74,3 +74,18 @@ export const stageLabel = (s: StageName) => STAGES[s] ?? s
 
 export const stagesFor = (mode: 'triage' | 'deep'): StageName[] =>
   mode === 'triage' ? ['parse', 'resolve', 'triage'] : ['parse', 'resolve', 'money', 'people', 'synthesize']
+
+/** First sentence and the rest. A sentence ends at . ! or ? followed by a space and a capital letter. */
+export function splitLead(text: string): [string, string] {
+  const m = text.match(/^(.+?[.!?])\s+(?=[A-Z])(?<![A-Z]\.[A-Z]\.\s)(.*)$/s)
+  return m ? [m[1]!.trim(), m[2]!.trim()] : [text.trim(), ''] // non-null: both groups always match when m does
+}
+
+/** Display-only: quotes are stored verbatim, but page markdown (#, **, links, bullets) reads as noise. */
+export const cleanQuote = (q: string) =>
+  q
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/^\s*(#{1,6}|[-*•])\s+/gm, '')
+    .replace(/\*\*|__|`/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
