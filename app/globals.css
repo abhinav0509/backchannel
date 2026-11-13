@@ -1,0 +1,233 @@
+@import 'tailwindcss';
+
+/*
+  Backchannel design tokens.
+  One accent (ink blue) for action; red and green only ever mean risk and in-favour.
+  Everything else is neutral so the evidence markers are the one thing that stands out.
+*/
+:root {
+  --canvas: #fbfbfd;
+  --surface: #ffffff;
+  --sunken: #f2f2f5;
+  --ink: #1d1d1f;
+  --ink-2: #515154;
+  --ink-3: #86868b;
+  --line: #d2d2d7;
+  --line-soft: #e8e8ed;
+  --accent: #3550d6;
+  --accent-ink: #ffffff;
+  --accent-soft: #eef1fd;
+  --risk: #c2384f;
+  --risk-soft: #fbeef0;
+  --green: #1e8a5a;
+  --green-soft: #ebf6f0;
+  --amber: #a36100;
+
+  /* Motion: strong ease-out for things that respond to a person; nothing linear, nothing bouncy. */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --t-fast: 140ms;
+  --t-base: 200ms;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas: #000000;
+    --surface: #161617;
+    --sunken: #1d1d1f;
+    --ink: #f5f5f7;
+    --ink-2: #c7c7cc;
+    --ink-3: #8e8e93;
+    --line: #38383a;
+    --line-soft: #2c2c2e;
+    --accent: #7b8ff0;
+    --accent-ink: #0b1030;
+    --accent-soft: #1b2142;
+    --risk: #ff6b81;
+    --risk-soft: #3a1a20;
+    --green: #4cc38a;
+    --green-soft: #12291e;
+    --amber: #f0a43a;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-risk: var(--risk);
+  --color-risk-soft: var(--risk-soft);
+  --color-green: var(--green);
+  --color-green-soft: var(--green-soft);
+  --color-amber: var(--amber);
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Helvetica Neue', sans-serif;
+  --ease-out: var(--ease-out);
+}
+
+html {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.022em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Display type: tighter tracking as size grows (SF's optical behaviour, applied by hand). */
+.t-display {
+  font-size: 40px;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+  font-weight: 650;
+}
+.t-title {
+  font-size: 24px;
+  line-height: 1.2;
+  letter-spacing: -0.028em;
+  font-weight: 620;
+}
+.t-lede {
+  font-size: 21px;
+  line-height: 1.45;
+  letter-spacing: -0.024em;
+}
+.t-small {
+  font-size: 14px;
+  line-height: 1.43;
+  letter-spacing: -0.012em;
+}
+.t-micro {
+  font-size: 12px;
+  line-height: 1.33;
+  letter-spacing: 0;
+}
+@media (max-width: 640px) {
+  .t-display {
+    font-size: 32px;
+  }
+  .t-lede {
+    font-size: 19px;
+  }
+}
+
+/* Buttons respond on press: a small, quick scale is felt more than seen. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 560;
+  letter-spacing: -0.016em;
+  transition:
+    transform var(--t-fast) var(--ease-out),
+    background-color var(--t-fast) var(--ease-out),
+    opacity var(--t-fast) var(--ease-out);
+  cursor: pointer;
+  user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--accent) 88%, var(--ink));
+}
+.btn-quiet {
+  background: var(--sunken);
+  color: var(--ink);
+}
+.btn-quiet:hover:not(:disabled) {
+  background: color-mix(in oklab, var(--sunken) 85%, var(--ink));
+}
+
+/* Popovers grow out of their trigger, enter on ease-out and leave faster than they came. */
+.pop {
+  transform-origin: var(--origin, top left);
+  transition:
+    opacity var(--t-fast) var(--ease-out),
+    transform var(--t-fast) var(--ease-out);
+  @starting-style {
+    opacity: 0;
+    transform: scale(0.96) translateY(-2px);
+  }
+}
+
+/* Expanding rows animate height with grid rows, so content is never measured in JS. */
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--t-base) var(--ease-out);
+}
+.reveal[data-open='true'] {
+  grid-template-rows: 1fr;
+}
+.reveal > * {
+  overflow: hidden;
+}
+
+/* Live stage indicator: a ring that turns, used only while research is actually running. */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes fill-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+.fill-in {
+  animation: fill-in 320ms var(--ease-out) both;
+}
+.meter {
+  transition: width 600ms var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+  .spinner {
+    animation: none;
+  }
+}

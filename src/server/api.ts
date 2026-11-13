@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { reconcile, isActive, startRun } from '../store/runner.js'
 import { createOpportunity, getOpportunity, listOpportunities, type Opportunity } from '../store/store.js'
+import { toMarkdown, triageToMarkdown } from '../report/markdown.js'
 import { Domain, type Flag, type ScoreDimension, type StageName } from '../types/research.js'
+import { slug } from '../util/slug.js'
 
 export interface Reply {
   status: number
@@ -79,4 +81,14 @@ export async function run(id: string, body: unknown): Promise<Reply> {
   if (isActive(id)) return reply(409, { error: 'Research is already running for this opportunity.' })
   void startRun(id, b.data.companyDomain ? { mode: b.data.mode, companyDomain: b.data.companyDomain } : { mode: b.data.mode })
   return reply(202, { id })
+}
+
+export function markdown(id: string): Reply & { filename?: string } {
+  const o = getOpportunity(id)
+  const r = o?.report ?? o?.triage
+  if (!o || !r) return reply(404, 'No report yet.')
+  const name = slug(r.identity.display_name, r.role.title)
+  return o.report
+    ? { status: 200, body: toMarkdown(o.report), filename: `${name}.md` }
+    : { status: 200, body: triageToMarkdown(o.triage!), filename: `${name}.quick-check.md` } // non-null: r is the triage here
 }

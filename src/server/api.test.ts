@@ -103,3 +103,17 @@ describe('list summaries', () => {
     expect((api.list().body as Summary[])[0]?.cost_usd).toBeCloseTo(1.25)
   })
 })
+
+describe('markdown', () => {
+  it('returns the deep report as markdown, else the triage, else 404', () => {
+    expect(api.markdown('unknownid0').status).toBe(404)
+    const o = createOpportunity('x')
+    expect(api.markdown(o.id).status).toBe(404)
+    updateOpportunity(o.id, (d) => ({ ...d, triage: validTriage() }))
+    expect(api.markdown(o.id).body).toMatch(/quick check/)
+    updateOpportunity(o.id, (d) => ({ ...d, report: validReport() }))
+    const r = api.markdown(o.id)
+    expect(r).toMatchObject({ status: 200, filename: 'example-product-designer.md' })
+    expect(r.body).toMatch(/^# Example: Product Designer/)
+  })
+})

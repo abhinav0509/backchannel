@@ -76,3 +76,16 @@ describe('large schemas', () => {
     expect(lastArgs()).toMatchObject({ constrained: false })
   })
 })
+
+describe('synthPrompt', () => {
+  it('leaves out run bookkeeping, so equal research gives an equal prompt (and a cache hit)', async () => {
+    const { synthPrompt } = await import('./stage8-synthesize.js')
+    const { validReport } = await import('../test/fixtures.js')
+    const { flags: _f, scores: _s, questions_to_ask: _q, verdict: _v, ...draft } = validReport()
+    const a = synthPrompt(draft, null)
+    const b = synthPrompt({ ...draft, generated_at: '2030-01-01T00:00:00.000Z', run: { ...draft.run, duration_ms: 99, cost_usd: 9 } }, null)
+    expect(a).toBe(b)
+    expect(a).not.toContain('duration_ms')
+    expect(a).toContain('Example Inc.')
+  })
+})

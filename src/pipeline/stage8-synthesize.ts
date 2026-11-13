@@ -24,6 +24,9 @@ export type Draft = Omit<CompanyResearch, 'flags' | 'scores' | 'questions_to_ask
 export const synthSystem = `You turn sourced company research into a decision aid for one candidate deciding whether to interview. Today is ${today()}.
 You are direct. You state the main risk plainly. You never add facts that are not in the research, and you never present an inference as a fact.`
 
+// Only the findings: run bookkeeping changes every run and would only add noise and bust the cache.
+const findings = ({ identity, money, people, role, gaps }: Draft) => ({ identity, money, people, role, gaps })
+
 export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK
 From the research below, produce:
 - flags: risk and green flags from this fixed taxonomy only: ${Flag.shape.kind.options.join(', ')}.
@@ -38,7 +41,7 @@ CANDIDATE PROFILE
 ${profile ? JSON.stringify(profile, null, 2) : 'No candidate profile was provided. role_fit and career_signal cannot be judged against the candidate: mark them unknown and say so in gaps.'}
 
 RESEARCH
-${JSON.stringify(draft, null, 2)}`
+${JSON.stringify(findings(draft), null, 2)}`
 
 export async function synthesize(input: { draft: Draft; profile: Profile | null }, budget: Budget) {
   return callStructured({
