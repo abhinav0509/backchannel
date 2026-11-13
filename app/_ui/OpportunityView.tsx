@@ -22,7 +22,7 @@ type Tab = 'decision' | 'company' | 'run'
  * finishes. With Supabase, new run events arrive over Realtime and a slow poll is only a safety
  * net; locally it polls.
  */
-function useLive(initial: Opportunity) {
+function useLive(initial: Opportunity, realtime: boolean) {
   const [o, setO] = useState(initial)
   useEffect(() => {
     if (o.status !== 'running') return
@@ -30,7 +30,7 @@ function useLive(initial: Opportunity) {
       const res = await fetch(`/api/opportunities/${o.id}`, { cache: 'no-store' })
       if (res.ok) setO((await res.json()) as Opportunity)
     }
-    const supabase = supabaseBrowser()
+    const supabase = realtime ? supabaseBrowser() : null
     const channel = supabase
       ?.channel(`run-events-${o.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'run_events', filter: `opportunity_id=eq.${o.id}` }, () => void refresh())
@@ -44,8 +44,8 @@ function useLive(initial: Opportunity) {
   return [o, setO] as const
 }
 
-export function OpportunityView({ initial }: { initial: Opportunity }) {
-  const [o, setO] = useLive(initial)
+export function OpportunityView({ initial, realtime }: { initial: Opportunity; realtime: boolean }) {
+  const [o, setO] = useLive(initial, realtime)
   const [tab, setTab] = useState<Tab>('decision')
   const [startError, setStartError] = useState<string | null>(null)
   const index = useMemo(() => sourceIndex(o.report ?? o.triage), [o.report, o.triage])

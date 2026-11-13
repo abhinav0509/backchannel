@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function proxy(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-  if (!url || !key) return NextResponse.next() // local mode: no auth
+  if (!url || !key || process.env.AUTH_DISABLED === 'true') return NextResponse.next() // local or open mode: no sign-in
 
   let response = NextResponse.next({ request })
   const supabase = createServerClient(url, key, {

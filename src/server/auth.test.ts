@@ -33,3 +33,23 @@ describe('missingConfig', () => {
     expect(missingConfig({})).toEqual(['ANTHROPIC_API_KEY'])
   })
 })
+
+describe('AUTH_DISABLED (temporary open mode)', () => {
+  const hosted = { VERCEL: '1', DATABASE_URL: 'postgres://x', ANTHROPIC_API_KEY: 'k' }
+  it('runs without sign-in when explicitly switched off, even on Vercel', () => {
+    expect(authMode({ ...hosted, AUTH_DISABLED: 'true' })).toBe('open')
+    expect(authMode({ ...hosted, AUTH_DISABLED: 'true', NEXT_PUBLIC_SUPABASE_URL: 'u', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'k' })).toBe('open')
+  })
+  it('only the exact value true switches it off', () => expect(authMode({ ...hosted, AUTH_DISABLED: 'yes' })).toBe('misconfigured'))
+  it('open mode still needs the database and API key, but not the sign-in variables', async () => {
+    const { missingConfig } = await import('./auth')
+    expect(missingConfig({ VERCEL: '1', AUTH_DISABLED: 'true' })).toEqual(['DATABASE_URL', 'ANTHROPIC_API_KEY'])
+    expect(missingConfig({ ...hosted, AUTH_DISABLED: 'true' })).toEqual([])
+  })
+  it('in open mode research belongs to BACKCHANNEL_OWNER, so it is yours when sign-in returns', async () => {
+    const { openOwner, LOCAL_OWNER } = await import('./auth')
+    expect(openOwner({ BACKCHANNEL_OWNER: '719a2c31-2a0a-406d-befb-ae930cc55978' })).toBe('719a2c31-2a0a-406d-befb-ae930cc55978')
+    expect(openOwner({})).toBe(LOCAL_OWNER)
+    expect(openOwner({ BACKCHANNEL_OWNER: 'not-a-uuid' })).toBe(LOCAL_OWNER)
+  })
+})
