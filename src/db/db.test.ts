@@ -2,7 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { migrate, openDb } from './db'
+import { jsonSerialize, migrate, openDb } from './db'
 
 describe('db', () => {
   it('opens an in-memory Postgres and round-trips parameters, JSON and timestamps', async () => {
@@ -39,6 +39,11 @@ describe('db', () => {
     const b = openDb(`pglite:${dir}`)
     expect(await b.query('select key from llm_cache')).toEqual([{ key: 'k' }])
     await b.close()
+  })
+
+  it('does not encode JSON twice: the repo passes JSON text for jsonb parameters', () => {
+    expect(jsonSerialize('{"a":1}')).toBe('{"a":1}')
+    expect(jsonSerialize({ a: 1 })).toBe('{"a":1}')
   })
 
   it('refuses an unknown database URL', () => expect(() => openDb('mysql://x')).toThrow(/DATABASE_URL/))

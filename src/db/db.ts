@@ -23,10 +23,22 @@ end $$;`
  * DATABASE_URL forms: postgres://… (Supabase; use the transaction pooler on Vercel),
  * pglite:memory (tests), pglite:<dir> (local development, persisted on disk).
  */
+/**
+ * postgres.js JSON-encodes every json/jsonb parameter, and the repo already passes JSON text, so
+ * values were stored as JSON strings. Text passes through; anything else is encoded once.
+ */
+export const jsonSerialize = (x: unknown) => (typeof x === 'string' ? x : JSON.stringify(x))
+
 export function openDb(url = process.env.DATABASE_URL ?? defaultUrl()): Db {
   if (url.startsWith('postgres://') || url.startsWith('postgresql://')) {
     // prepare: false because Supabase's transaction pooler does not support prepared statements.
-    const sql = postgres(url, { prepare: false, max: 5, idle_timeout: 20, onnotice: () => {} })
+    const sql = postgres(url, {
+      prepare: false,
+      max: 5,
+      idle_timeout: 20,
+      onnotice: () => {},
+      types: { json: { to: 114, from: [114, 3802], serialize: jsonSerialize, parse: (x: string) => JSON.parse(x) as unknown } },
+    })
     return {
       query: async <T,>(text: string, params: unknown[] = []) => (await sql.unsafe(text, params as never[])) as unknown as T[],
       exec: async (script) => void (await sql.unsafe(script)),
