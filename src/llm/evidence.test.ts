@@ -70,3 +70,11 @@ describe('collectEvidenceUrls', () => {
     expect(collectEvidenceUrls(v)).toEqual([GOOD, 'https://b.example/1', 'https://c.example/'])
   })
 })
+
+describe('validateSourced JSON extraction', () => {
+  it('accepts JSON wrapped in a code fence or surrounding prose', () => {
+    const S = z.object({ a: z.number() })
+    expect(validateSourced('```json\n{"a":1}\n```', S)).toMatchObject({ ok: true, data: { a: 1 } })
+    expect(validateSourced('Here it is:\n{"a":2}\nDone.', S)).toMatchObject({ ok: true, data: { a: 2 } })
+  })
+})

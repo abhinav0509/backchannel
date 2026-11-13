@@ -1,5 +1,5 @@
 import type { Profile } from '../types/profile.js'
-import type { CompanyResearch, StageName, StageStatus, TriageResult } from '../types/research.js'
+import type { CompanyResearch, RunEvent, StageName, StageStatus, TriageResult } from '../types/research.js'
 import { runBudget, type Budget } from '../util/cost.js'
 import { money } from './stage3-money.js'
 import { people } from './stage4-people.js'
@@ -8,13 +8,7 @@ import { parse } from './stage0-parse.js'
 import { gate, resolve, type Candidate } from './stage1-resolve.js'
 import { triage } from './stage-triage.js'
 
-export interface RunEvent {
-  stage: StageName
-  status: 'started' | StageStatus
-  at: string
-  output?: unknown
-  error?: string
-}
+export type { RunEvent }
 
 export type RunOutcome =
   | { kind: 'report'; report: CompanyResearch; budget: Budget }

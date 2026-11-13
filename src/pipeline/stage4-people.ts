@@ -24,6 +24,7 @@ ${researchRules(MAX_SEARCHES)}`
 
 export const peopleTask = `headcount: the most recent sourced figure or null; headcount_trend: year and count pairs only where sourced. layoff_events, leadership_changes, review_scores: one claim per item. A review score's trend is unknown unless a source shows direction.`
 
+// constrained: false because this schema exceeds the API's structured-output grammar limit (400, probed 2026-11-13).
 export async function people(c: { display_name: string; domain: string }, budget: Budget) {
-  return researchStage({ stage: 'people', budget, system: peopleSystem, prompt: peoplePrompt(c), maxSearches: MAX_SEARCHES, task: peopleTask, schema: PeopleOut })
+  return researchStage({ stage: 'people', budget, system: peopleSystem, prompt: peoplePrompt(c), maxSearches: MAX_SEARCHES, task: peopleTask, schema: PeopleOut, constrained: false })
 }

@@ -1,6 +1,6 @@
 import type Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { BudgetExceeded, type Budget } from '../util/cost.js'
 import type { StageName } from '../types/research.js'
 import { assertSearchSupported, send } from './client.js'
@@ -29,8 +29,15 @@ export async function callStructured<S extends z.ZodType>(o: {
   schema: S
   effort?: Effort
   retrievedUrls?: readonly string[]
+  // false for schemas too large for the API's structured-output grammar: the JSON Schema goes in
+  // the prompt instead, and the zod check plus retries still enforce it.
+  constrained?: boolean
 }): Promise<{ data: z.output<S>; dropped: string[] }> {
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: o.prompt }]
+  const constrained = o.constrained ?? true
+  const prompt = constrained
+    ? o.prompt
+    : `${o.prompt}\n\nReturn only JSON matching this JSON Schema, with no prose:\n${JSON.stringify(z.toJSONSchema(o.schema, { io: 'input' }))}`
+  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: prompt }]
   let issues = ''
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const { content } = await send(
@@ -39,7 +46,9 @@ export async function callStructured<S extends z.ZodType>(o: {
         max_tokens: 16000,
         system: o.system,
         messages,
-        output_config: { format: zodOutputFormat(o.schema), ...(o.effort && { effort: o.effort }) },
+        ...((constrained || o.effort) && {
+          output_config: { ...(constrained && { format: zodOutputFormat(o.schema) }), ...(o.effort && { effort: o.effort }) },
+        }),
       },
       { stage: o.stage, budget: o.budget },
     )

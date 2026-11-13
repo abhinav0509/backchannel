@@ -64,3 +64,14 @@ describe('callResearch', () => {
     expect(send.mock.calls[0]?.[0].tools[0].max_uses).toBe(2)
   })
 })
+
+describe('callStructured without constrained decoding', () => {
+  it('puts the JSON Schema in the prompt instead of output_config, for schemas too large for the grammar', async () => {
+    send.mockResolvedValueOnce(text('```json\n{"year":2020}\n```'))
+    await expect(callStructured({ ...opts(), constrained: false })).resolves.toMatchObject({ data: { year: 2020 } })
+    const params = send.mock.calls[0]?.[0]
+    expect(params.output_config?.format).toBeUndefined()
+    expect(params.messages[0].content).toContain('"year"')
+    expect(params.messages[0].content).toMatch(/only JSON/i)
+  })
+})

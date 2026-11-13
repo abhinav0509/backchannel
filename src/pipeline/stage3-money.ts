@@ -24,6 +24,7 @@ ${researchRules(MAX_SEARCHES)}`
 
 export const moneyTask = `ownership_type: one of public, pe_backed, vc_backed, bootstrapped, subsidiary, unknown; null if no source states it. funding_events: one claim per event; amount and currency as reported, never converted. revenue_signal, profitability: a short sentence each, or null. exit_activity: one claim per sale process, IPO signal or acquisition.`
 
+// constrained: false because this schema exceeds the API's structured-output grammar limit (400, probed 2026-11-13).
 export async function money(c: { display_name: string; domain: string }, budget: Budget) {
-  return researchStage({ stage: 'money', budget, system: moneySystem, prompt: moneyPrompt(c), maxSearches: MAX_SEARCHES, task: moneyTask, schema: MoneyOut })
+  return researchStage({ stage: 'money', budget, system: moneySystem, prompt: moneyPrompt(c), maxSearches: MAX_SEARCHES, task: moneyTask, schema: MoneyOut, constrained: false })
 }

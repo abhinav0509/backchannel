@@ -84,7 +84,9 @@ export type Validated<T> = { ok: true; data: T; dropped: string[] } | { ok: fals
 export function validateSourced<S extends z.ZodType>(text: string, schema: S, retrieved?: Iterable<string>): Validated<z.output<S>> {
   let raw: unknown
   try {
-    raw = JSON.parse(text)
+    // Unconstrained output can arrive fenced or with a sentence around it; take the outer object.
+    const start = text.indexOf('{')
+    raw = JSON.parse(start === -1 ? text : text.slice(start, text.lastIndexOf('}') + 1))
   } catch (err) {
     return { ok: false, issues: `not valid JSON: ${err instanceof Error ? err.message : String(err)}` }
   }

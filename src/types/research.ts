@@ -167,6 +167,15 @@ export const CompanyResearch = z.object({
   run: Run,
 })
 
+/** One progress update from a run, for live UI. */
+export const RunEvent = z.object({
+  stage: StageName,
+  status: z.union([z.literal('started'), StageStatus]),
+  at: z.iso.datetime(),
+  output: z.unknown().optional(),
+  error: z.string().optional(),
+})
+
 /** The cheap first pass run on every email: is this worth a deep run? */
 export const TriageResult = z.object({
   schema_version: z.literal(2),
@@ -188,7 +197,9 @@ export type ReviewScore = z.infer<typeof ReviewScore>
 export type FlagKind = z.infer<typeof FlagKind>
 export type Flag = z.infer<typeof Flag>
 export type Score = z.infer<typeof Score>
+export type ScoreDimension = z.infer<typeof ScoreDimension>
 export type StageName = z.infer<typeof StageName>
 export type StageStatus = z.infer<typeof StageStatus>
 export type CompanyResearch = z.infer<typeof CompanyResearch>
 export type TriageResult = z.infer<typeof TriageResult>
+export type RunEvent = z.infer<typeof RunEvent>

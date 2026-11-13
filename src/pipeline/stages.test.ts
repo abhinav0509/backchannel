@@ -67,3 +67,12 @@ describe('synthesize', () => {
     expect(a.prompt).toMatch(/no candidate profile/i)
   })
 })
+
+describe('large schemas', () => {
+  it('money and people extract without constrained decoding', async () => {
+    await money(company, budget())
+    expect(lastArgs()).toMatchObject({ constrained: false })
+    await people(company, budget())
+    expect(lastArgs()).toMatchObject({ constrained: false })
+  })
+})

@@ -27,3 +27,11 @@ describe('researchStage', () => {
     expect(r).toEqual({ data: { ok: 1 }, dropped: ['d'], searchCapped: true })
   })
 })
+
+it('passes constrained through to extraction', async () => {
+  callResearch.mockResolvedValueOnce({ notes: '', sources: [], retrievedUrls: [], searchCapped: false, at: '2026-11-01T00:00:00.000Z' })
+  callStructured.mockResolvedValueOnce({ data: {}, dropped: [] })
+  const budget = new Budget({ searchesPerRun: 40, tokensPerRun: 1e6 }, { spentBefore: 0, capUsd: 20 })
+  await researchStage({ stage: 'money', budget, system: 's', prompt: 'p', maxSearches: 1, task: 't', schema: z.object({}), constrained: false })
+  expect(callStructured.mock.calls.at(-1)?.[0]).toMatchObject({ constrained: false })
+})

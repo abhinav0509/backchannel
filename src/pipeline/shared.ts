@@ -55,6 +55,7 @@ export async function researchStage<S extends z.ZodType>(o: {
   maxSearches: number
   task: string
   schema: S
+  constrained?: boolean
 }): Promise<{ data: z.output<S>; dropped: string[]; searchCapped: boolean }> {
   const research = await callResearch({
     stage: o.stage,
@@ -72,6 +73,7 @@ export async function researchStage<S extends z.ZodType>(o: {
     prompt: extractionPrompt({ task: o.task, notes: research.notes, sources: research.sources, retrievedAt: research.at }),
     schema: o.schema,
     retrievedUrls: research.retrievedUrls,
+    ...(o.constrained === false && { constrained: false }),
   })
   return { data, dropped, searchCapped: research.searchCapped }
 }
