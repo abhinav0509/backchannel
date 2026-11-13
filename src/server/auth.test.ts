@@ -40,7 +40,11 @@ describe('AUTH_DISABLED (temporary open mode)', () => {
     expect(authMode({ ...hosted, AUTH_DISABLED: 'true' })).toBe('open')
     expect(authMode({ ...hosted, AUTH_DISABLED: 'true', NEXT_PUBLIC_SUPABASE_URL: 'u', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'k' })).toBe('open')
   })
-  it('only the exact value true switches it off', () => expect(authMode({ ...hosted, AUTH_DISABLED: 'yes' })).toBe('misconfigured'))
+  it('accepts true in any case and with stray spaces, and nothing else', () => {
+    expect(authMode({ ...hosted, AUTH_DISABLED: ' TRUE ' })).toBe('open')
+    expect(authMode({ ...hosted, AUTH_DISABLED: 'yes' })).toBe('misconfigured')
+    expect(authMode({ ...hosted, AUTH_DISABLED: 'false' })).toBe('misconfigured')
+  })
   it('open mode still needs the database and API key, but not the sign-in variables', async () => {
     const { missingConfig } = await import('./auth')
     expect(missingConfig({ VERCEL: '1', AUTH_DISABLED: 'true' })).toEqual(['DATABASE_URL', 'ANTHROPIC_API_KEY'])
@@ -51,5 +55,19 @@ describe('AUTH_DISABLED (temporary open mode)', () => {
     expect(openOwner({ BACKCHANNEL_OWNER: '719a2c31-2a0a-406d-befb-ae930cc55978' })).toBe('719a2c31-2a0a-406d-befb-ae930cc55978')
     expect(openOwner({})).toBe(LOCAL_OWNER)
     expect(openOwner({ BACKCHANNEL_OWNER: 'not-a-uuid' })).toBe(LOCAL_OWNER)
+  })
+})
+
+describe('health', () => {
+  it('reports mode, missing variable names and the deployed commit, never values', async () => {
+    const { health } = await import('./auth')
+    const h = health({ VERCEL: '1', AUTH_DISABLED: 'true', DATABASE_URL: 'postgres://user:SECRET@host/db', VERCEL_GIT_COMMIT_SHA: 'abc1234def' })
+    expect(h).toEqual({ mode: 'open', missing: ['ANTHROPIC_API_KEY'], commit: 'abc1234', database: 'postgres' })
+    expect(JSON.stringify(h)).not.toContain('SECRET')
+  })
+  it('names the database kind so a direct (IPv6-only) Supabase host is caught', async () => {
+    const { health } = await import('./auth')
+    expect(health({ DATABASE_URL: 'postgresql://postgres:x@db.abc.supabase.co:5432/postgres' }).database).toBe('supabase-direct (unreachable from Vercel: use the transaction pooler)')
+    expect(health({ DATABASE_URL: 'postgresql://postgres.abc:x@aws-0-ap-south-1.pooler.supabase.com:6543/postgres' }).database).toBe('supabase-pooler')
   })
 })

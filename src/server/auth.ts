@@ -7,8 +7,11 @@ export const LOCAL_OWNER = '00000000-0000-0000-0000-000000000001'
 type Env = Partial<Record<string, string>>
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/** AUTH_DISABLED=true, forgiving of case and stray spaces from pasting into a dashboard. */
+export const authDisabled = (env: Env = process.env) => env.AUTH_DISABLED?.trim().toLowerCase() === 'true'
+
 export function authMode(env: Env = process.env): 'supabase' | 'local' | 'open' | 'misconfigured' {
-  if (env.AUTH_DISABLED === 'true') return 'open'
+  if (authDisabled(env)) return 'open'
   const supabase = Boolean(env.NEXT_PUBLIC_SUPABASE_URL && env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY)
   if (supabase) return env.ALLOWED_EMAILS?.trim() ? 'supabase' : 'misconfigured'
   return env.VERCEL ? 'misconfigured' : 'local'
@@ -27,6 +30,19 @@ const SIGN_IN = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_K
 
 /** Environment variable names (never values) this deployment still needs. */
 export function missingConfig(env: Env = process.env): string[] {
-  const needed = !env.VERCEL ? ['ANTHROPIC_API_KEY'] : env.AUTH_DISABLED === 'true' ? ['DATABASE_URL', 'ANTHROPIC_API_KEY'] : ['DATABASE_URL', ...SIGN_IN, 'ANTHROPIC_API_KEY']
+  const needed = !env.VERCEL ? ['ANTHROPIC_API_KEY'] : authDisabled(env) ? ['DATABASE_URL', 'ANTHROPIC_API_KEY'] : ['DATABASE_URL', ...SIGN_IN, 'ANTHROPIC_API_KEY']
   return needed.filter((k) => !env[k]?.trim())
+}
+
+function databaseKind(url = ''): string {
+  if (!url) return 'none'
+  if (url.startsWith('pglite:')) return 'pglite'
+  if (/@db\.[^.]+\.supabase\.co/.test(url)) return 'supabase-direct (unreachable from Vercel: use the transaction pooler)'
+  if (/pooler\.supabase\.com/.test(url)) return 'supabase-pooler'
+  return 'postgres'
+}
+
+/** What a deployment is running with, for diagnosis. Names and kinds only: never a value. */
+export function health(env: Env = process.env) {
+  return { mode: authMode(env), missing: missingConfig(env), commit: env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? 'local', database: databaseKind(env.DATABASE_URL) }
 }
