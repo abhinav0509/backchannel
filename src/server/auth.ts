@@ -16,3 +16,11 @@ export function ownerFromClaims(claims: { sub?: string; email?: string } | null 
   const allowed = allowedEmails.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
   return allowed.includes(claims.email.toLowerCase()) ? claims.sub : null
 }
+
+const HOSTED = ['DATABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'ALLOWED_EMAILS'] as const
+
+/** Environment variable names (never values) this deployment still needs. */
+export function missingConfig(env: Env = process.env): string[] {
+  const needed = env.VERCEL ? [...HOSTED, 'ANTHROPIC_API_KEY'] : ['ANTHROPIC_API_KEY']
+  return needed.filter((k) => !env[k]?.trim())
+}

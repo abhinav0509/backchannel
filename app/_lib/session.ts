@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { authMode, LOCAL_OWNER, ownerFromClaims } from '../../src/server/auth'
+import { authMode, LOCAL_OWNER, missingConfig, ownerFromClaims } from '../../src/server/auth'
 import { supabaseServer } from './supabase'
 
 /** The signed-in owner's id, or null. Throws when the deployment is missing its auth configuration. */
@@ -13,6 +13,7 @@ export async function currentOwner(): Promise<string | null> {
 
 /** For pages: the owner, or a redirect to sign in. */
 export async function requireOwner(): Promise<string> {
+  if (authMode() === 'misconfigured') redirect('/setup')
   const owner = await currentOwner()
   if (!owner) redirect('/login')
   return owner
@@ -20,5 +21,6 @@ export async function requireOwner(): Promise<string> {
 
 /** For route handlers: the owner, or a 401 response to return. */
 export async function ownerOr401(): Promise<string | Response> {
+  if (authMode() === 'misconfigured') return Response.json({ error: `Not configured. Missing: ${missingConfig().join(', ')}` }, { status: 503 })
   return (await currentOwner()) ?? Response.json({ error: 'Sign in to continue.' }, { status: 401 })
 }

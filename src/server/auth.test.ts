@@ -21,3 +21,15 @@ describe('ownerFromClaims', () => {
   })
   it('the local owner is a fixed uuid', () => expect(LOCAL_OWNER).toMatch(/^[0-9a-f-]{36}$/))
 })
+
+describe('missingConfig', () => {
+  it('names the variables a deployment still needs, never their values', async () => {
+    const { missingConfig } = await import('./auth')
+    expect(missingConfig({ VERCEL: '1' })).toEqual(['DATABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'ALLOWED_EMAILS', 'ANTHROPIC_API_KEY'])
+    expect(missingConfig({ VERCEL: '1', DATABASE_URL: 'postgres://x', NEXT_PUBLIC_SUPABASE_URL: 'u', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'k', ALLOWED_EMAILS: 'a@b.co', ANTHROPIC_API_KEY: 'k' })).toEqual([])
+  })
+  it('requires nothing locally except the API key', async () => {
+    const { missingConfig } = await import('./auth')
+    expect(missingConfig({})).toEqual(['ANTHROPIC_API_KEY'])
+  })
+})
