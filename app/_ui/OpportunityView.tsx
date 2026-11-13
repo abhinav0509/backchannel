@@ -104,8 +104,8 @@ export function OpportunityView({ initial }: { initial: Opportunity }) {
                 onChange={setTab}
                 options={[
                   { value: 'decision', label: 'Decision' },
-                  { value: 'company', label: 'Company report' },
-                  { value: 'run', label: 'How it was researched' },
+                  { value: 'company', label: 'Company' },
+                  { value: 'run', label: 'Sources' },
                 ]}
               />
             </div>

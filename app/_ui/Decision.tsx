@@ -15,7 +15,7 @@ export function Decision({ r }: { r: CompanyResearch }) {
     <div className="space-y-16">
       {r.partial && (
         <p className="rounded-xl bg-sunken px-4 py-3 t-small text-ink-2">
-          Some research did not finish, so this report is incomplete. The run tab shows which parts.
+          Some research did not finish, so this report is incomplete. The Sources tab shows which parts.
         </p>
       )}
 
