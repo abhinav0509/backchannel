@@ -3,8 +3,10 @@ import type { CompanyResearch, Flag, RunEvent, StageName, StageStatus, TriageRes
 import { runBudget, type Budget, type Spend } from '../util/cost'
 import { parse, type ParseOut } from './stage0-parse'
 import { gate, resolve, type Candidate, type ResolveOut } from './stage1-resolve'
+import { business, type BusinessOut } from './stage2-business'
 import { money, type MoneyOut } from './stage3-money'
 import { people, type PeopleOut } from './stage4-people'
+import { market, type MarketOut } from './stage5-market'
 import { synthesize, type Draft, type SynthOut } from './stage8-synthesize'
 import { triage, type TriageOut } from './stage-triage'
 
@@ -80,17 +82,33 @@ const strip = <T extends { gaps: string[] }>({ gaps: _g, ...rest }: T) => rest
 type Identity = NonNullable<ResolveOut['identity']>
 
 /** The research so far, as stage 8 sees it. */
-export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; money: StageResult<MoneyOut>; people: StageResult<PeopleOut>; totals: Totals }): Draft {
-  const status = { parse: 'ok', resolve: 'ok', money: statusOf(p.money), people: statusOf(p.people) } as const
+/** The four deep research stages, which run in parallel. */
+export interface DeepStages {
+  business: StageResult<BusinessOut>
+  money: StageResult<MoneyOut>
+  people: StageResult<PeopleOut>
+  market: StageResult<MarketOut>
+}
+
+export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; totals: Totals } & DeepStages): Draft {
+  const status = { parse: 'ok', resolve: 'ok', business: statusOf(p.business), money: statusOf(p.money), people: statusOf(p.people), market: statusOf(p.market) } as const
   return {
     schema_version: 2,
     generated_at: new Date().toISOString(),
     partial: Object.values(status).some((s) => s !== 'ok'),
     identity: p.identity,
+    business: p.business.data ? strip(p.business.data) : null,
     money: p.money.data ? strip(p.money.data) : EMPTY_MONEY,
     people: p.people.data ? strip(p.people.data) : EMPTY_PEOPLE,
+    market: p.market.data ? strip(p.market.data) : null,
     role: p.parsed.role,
-    gaps: unique([...p.resolveGaps, ...stageGaps('money', p.money), ...stageGaps('people', p.people)]),
+    gaps: unique([
+      ...p.resolveGaps,
+      ...stageGaps('business', p.business),
+      ...stageGaps('money', p.money),
+      ...stageGaps('people', p.people),
+      ...stageGaps('market', p.market),
+    ]),
     run: runField('deep', p.totals, status),
   }
 }
@@ -103,7 +121,9 @@ export function assembleReport(draft: Draft, synth: StageResult<SynthOut>, total
     partial: Object.values(stage_status).some((x) => x !== 'ok'),
     flags: s?.flags ?? [],
     scores: s?.scores ?? [],
-    questions_to_ask: s?.questions_to_ask ?? [],
+    questions_to_ask: (s?.questions ?? []).map((q) => q.question),
+    questions: s?.questions ?? [],
+    outlook: s?.outlook ?? null,
     verdict: s?.verdict ?? 'Synthesis did not complete, so there are no flags, scores or verdict. The sourced research below is still valid.',
     // Synthesis gaps are the curated, decision-relevant ones; stage notes and dropped claims follow.
     gaps: unique([...(s?.gaps ?? []), ...draft.gaps, ...(s ? synth.dropped : stageGaps('synthesize', synth))]),
@@ -186,8 +206,13 @@ export async function runResearch(input: {
     return { kind: 'triage', result: assembleTriage({ parsed, identity: g.identity, resolveGaps: g.gaps, triage: t, totals: totals() }), budget }
   }
 
-  const [m, p] = await Promise.all([stage('money', () => money(g.identity, budget)), stage('people', () => people(g.identity, budget))])
-  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, money: m, people: p, totals: totals() })
+  const [b, m, p, k] = await Promise.all([
+    stage('business', () => business(g.identity, budget)),
+    stage('money', () => money(g.identity, budget)),
+    stage('people', () => people(g.identity, budget)),
+    stage('market', () => market(g.identity, budget)),
+  ])
+  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, business: b, money: m, people: p, market: k, totals: totals() })
   const s = await stage('synthesize', () => synthesize({ draft, profile: input.profile }, budget))
   return { kind: 'report', report: assembleReport(draft, s, totals()), budget }
 }

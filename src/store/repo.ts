@@ -4,6 +4,7 @@ import { getDb } from '../db/db'
 import { Candidate } from '../pipeline/stage1-resolve'
 import { Profile } from '../types/profile'
 import { CompanyResearch, RunEvent, StageName, TriageResult, type StageStatus } from '../types/research'
+import { Pipeline, PipelineReason, PrepEntry, TrackingPatch } from '../types/tracking'
 import { runSpend } from '../util/cost'
 
 // Every function takes the owner and scopes its query by it. The server connects as a role that
@@ -45,6 +46,13 @@ export const Opportunity = z.object({
   triage: TriageResult.nullable(),
   report: CompanyResearch.nullable(),
   runs: z.array(RunRecord),
+  pipeline: Pipeline,
+  pipeline_reason: PipelineReason.nullable(),
+  pipeline_at: z.iso.datetime(),
+  notes: z.string(),
+  next_step: z.string().nullable(),
+  next_step_at: z.string().nullable(),
+  prep: z.record(z.string(), PrepEntry),
 })
 export type Opportunity = z.infer<typeof Opportunity>
 
@@ -80,6 +88,7 @@ interface OppRow {
   error: string | null
   triage: unknown
   report: unknown
+  pipeline_at: Date
 }
 interface RunRow {
   id: string
@@ -98,7 +107,7 @@ export async function getOpportunity(owner: string, oppId: string): Promise<Oppo
   const runs = await db.query<RunRow>(
     `select id, mode, status, started_at, finished_at, error,
             status = 'running' and started_at < now() - interval '${STALL_MINUTES} minutes' as stalled
-       from runs where opportunity_id = $1 order by started_at, id`,
+       from runs where opportunity_id = $1 order by seq`,
     [oppId],
   )
   const latest = runs.at(-1)
@@ -133,6 +142,7 @@ export async function getOpportunity(owner: string, oppId: string): Promise<Oppo
     ...row,
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
+    pipeline_at: iso(row.pipeline_at),
     status: stalled ? 'failed' : row.status,
     error: stalled ? 'Research stalled and was stopped. Start it again.' : row.error,
     events: events.map((e) => ({ stage: e.stage, status: e.status, at: iso(e.at), ...(e.output != null && { output: e.output }), ...(e.error && { error: e.error }) })),
@@ -156,6 +166,32 @@ export async function patchOpportunity(owner: string, oppId: string, patch: Patc
     [oppId, owner, ...values],
   )
   if (!rows.length) throw new Error(`no opportunity ${oppId}`)
+}
+
+/** Your own edits: stage, notes, next step, prep answers. Moving the stage stamps when, and drops a reason that no longer applies. */
+export async function updateTracking(owner: string, oppId: string, patch: TrackingPatch): Promise<void> {
+  const valid = TrackingPatch.parse(patch)
+  const fields: Record<string, unknown> = { ...valid }
+  if (valid.pipeline) fields.pipeline_reason = valid.pipeline_reason ?? null
+  const keys = Object.keys(fields)
+  if (!keys.length) return
+  const sets = keys.map((k, i) => `${k} = $${i + 3}${k === 'prep' ? '::jsonb' : ''}`)
+  if (valid.pipeline) sets.push('pipeline_at = now()')
+  const values = keys.map((k) => (k === 'prep' ? JSON.stringify(fields[k]) : fields[k]))
+  const rows = await (await getDb()).query(`update opportunities set ${[...sets, 'updated_at = now()'].join(', ')} where id = $1 and owner_id = $2 returning id`, [oppId, owner, ...values])
+  if (!rows.length) throw new Error(`no opportunity ${oppId}`)
+}
+
+/** How many opportunities sit in each stage, for navigation. Stages with none are left out. */
+export async function pipelineCounts(owner: string): Promise<Partial<Record<Pipeline, number>>> {
+  const rows = await (await getDb()).query<{ pipeline: Pipeline; n: number }>('select pipeline, count(*)::int as n from opportunities where owner_id = $1 group by pipeline', [owner])
+  return Object.fromEntries(rows.map((r) => [r.pipeline, r.n]))
+}
+
+/** Removes it with its runs and events. Spend rows stay (their run link is cleared), so the month's total does not shrink. */
+export async function deleteOpportunity(owner: string, oppId: string): Promise<boolean> {
+  const rows = await (await getDb()).query('delete from opportunities where id = $1 and owner_id = $2 returning id', [oppId, owner])
+  return rows.length > 0
 }
 
 /** Starts a run record and marks the opportunity as running. */

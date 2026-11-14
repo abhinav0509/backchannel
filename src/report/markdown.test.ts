@@ -24,14 +24,42 @@ const report = (): CompanyResearch => ({
     { dimension: 'job_security', value: 35, rationale: 'Layoffs.', evidence_urls: [A], unknown: false },
     { dimension: 'comp_confidence', value: 0, rationale: 'No data.', evidence_urls: [], unknown: true },
   ],
+  business: {
+    summary: c('Makes placeholder software.', [A]), products: [c({ name: 'Widget', description: 'A placeholder product.' }, [A])], customers: null, business_model: null,
+    competitors: [], founders: [c({ name: 'Founder One', role: 'CEO', background: null, since: '2015', still_involved: true }, [A])], leaders: [],
+  },
+  market: {
+    ai_stance: c('ai_adopting', [B]), ai_summary: null, ai_initiatives: [], strategy: null,
+    recent_news: [c({ date: '2026-09', headline: 'Placeholder launch' }, [B])], tailwinds: [], headwinds: [],
+  },
   questions_to_ask: ['How did the 2023 cuts affect design?'],
+  questions: [{ question: 'How did the 2023 cuts affect design?', why: 'A 10% cut in 2023.', topic: 'team' }],
   verdict: 'Main risk is layoffs.',
+  outlook: 'Placeholder outlook.',
   gaps: ['Compensation could not be established.'],
   run: { mode: 'deep', searches_used: 12, input_tokens: 1000, output_tokens: 100, cost_usd: 1.234, duration_ms: 200_000, stage_status: { money: 'ok', people: 'partial' } },
 })
 
 describe('toMarkdown', () => {
   const md = toMarkdown(report())
+
+  it('covers what the company does, its founders, AI and outlook, and why each question matters', () => {
+    expect(md).toContain('## What they do')
+    expect(md).toContain('Makes placeholder software. (reported) [1]')
+    expect(md).toMatch(/Founder One, CEO, since 2015, still involved/)
+    expect(md).toContain('## AI')
+    expect(md).toMatch(/AI adopting/i)
+    expect(md).toContain('## Outlook')
+    expect(md).toContain('Placeholder outlook.')
+    expect(md).toContain('2026-09: Placeholder launch')
+    expect(md).toMatch(/How did the 2023 cuts affect design\?\n\s+Why: A 10% cut in 2023\./)
+  })
+
+  it('leaves the new sections out of reports made before they existed', () => {
+    const old = toMarkdown({ ...report(), business: null, market: null, questions: [], outlook: null })
+    expect(old).not.toContain('## What they do')
+    expect(old).toContain('1. How did the 2023 cuts affect design?')
+  })
 
   it('titles with company and role and states partial runs up front', () => {
     expect(md.split('\n')[0]).toBe('# Example: Designer')

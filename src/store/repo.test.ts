@@ -45,6 +45,79 @@ describe('opportunities', () => {
   })
 })
 
+describe('tracking', () => {
+  it('starts new, with no notes or next step', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect(o).toMatchObject({ pipeline: 'new', pipeline_reason: null, notes: '', next_step: null, next_step_at: null, prep: {} })
+  })
+
+  it('moves through the pipeline, keeping a closing reason and when it moved', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await db.query("update opportunities set pipeline_at = now() - interval '2 days' where id = $1", [o.id])
+    const before = (await repo.getOpportunity(ME, o.id))!.pipeline_at
+    await repo.updateTracking(ME, o.id, { pipeline: 'passed', pipeline_reason: 'comp' })
+    const got = (await repo.getOpportunity(ME, o.id))!
+    expect(got).toMatchObject({ pipeline: 'passed', pipeline_reason: 'comp' })
+    expect(Date.parse(got.pipeline_at)).toBeGreaterThan(Date.parse(before))
+  })
+
+  it('clears a stale reason when it moves back to an open stage', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await repo.updateTracking(ME, o.id, { pipeline: 'closed', pipeline_reason: 'went_silent' })
+    await repo.updateTracking(ME, o.id, { pipeline: 'interviewing' })
+    expect((await repo.getOpportunity(ME, o.id))!).toMatchObject({ pipeline: 'interviewing', pipeline_reason: null })
+  })
+
+  it('saves notes, a dated next step and prep answers without touching the stage', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await repo.updateTracking(ME, o.id, { pipeline: 'screening' })
+    await repo.updateTracking(ME, o.id, { notes: 'Call went well.', next_step: 'Portfolio review', next_step_at: '2026-11-20', prep: { 'Who do I report to?': { asked: true, answer: 'VP Design' } } })
+    expect((await repo.getOpportunity(ME, o.id))!).toMatchObject({
+      pipeline: 'screening',
+      notes: 'Call went well.',
+      next_step: 'Portfolio review',
+      next_step_at: '2026-11-20',
+      prep: { 'Who do I report to?': { asked: true, answer: 'VP Design' } },
+    })
+  })
+
+  it('rejects a reason that does not fit, and anything outside the tracking fields', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await expect(repo.updateTracking(ME, o.id, { pipeline: 'interested', pipeline_reason: 'comp' })).rejects.toThrow()
+    await expect(repo.updateTracking(ME, o.id, { pipeline: 'passed', pipeline_reason: 'went_silent' })).rejects.toThrow()
+    await expect(repo.updateTracking(ME, o.id, { report: null } as never)).rejects.toThrow()
+    await expect(repo.updateTracking(ME, o.id, { next_step_at: 'next week' })).rejects.toThrow()
+  })
+
+  it('counts per stage for the owner, in one query', async () => {
+    const [a] = [await repo.createOpportunity(ME, 'a'), await repo.createOpportunity(ME, 'b'), await repo.createOpportunity(OTHER, 'c')]
+    await repo.updateTracking(ME, a.id, { pipeline: 'interviewing' })
+    expect(await repo.pipelineCounts(ME)).toEqual({ new: 1, interviewing: 1 })
+  })
+
+  it('only the owner can change or delete it', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await expect(repo.updateTracking(OTHER, o.id, { pipeline: 'offer' })).rejects.toThrow(/no opportunity/)
+    expect(await repo.deleteOpportunity(OTHER, o.id)).toBe(false)
+    expect(await repo.getOpportunity(ME, o.id)).not.toBeNull()
+  })
+
+  it('deletes with its runs and events, but keeps the spend so the monthly cap stays honest', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const run = await repo.beginRun(ME, o.id, 'triage')
+    await repo.recordEvent(ME, o.id, run, { stage: 'parse', status: 'started', at: '2026-11-13T09:00:00.000Z' })
+    const budget = await runBudget('triage', run)
+    budget.charge('parse', 'claude-haiku-5-5', { input: 1000, output: 100, cacheRead: 0, cacheWrite: 0, searches: 0 })
+    await budget.flush()
+    await repo.finishRun(ME, o.id, run, { status: 'failed', error: 'x' })
+    expect(await repo.deleteOpportunity(ME, o.id)).toBe(true)
+    expect(await repo.getOpportunity(ME, o.id)).toBeNull()
+    expect(await db.query('select 1 from runs where opportunity_id = $1', [o.id])).toEqual([])
+    expect(await db.query('select 1 from run_events where opportunity_id = $1', [o.id])).toEqual([])
+    expect((await db.query<{ n: number }>('select count(*)::int n from spend'))[0]!.n).toBe(1)
+  })
+})
+
 describe('runs and events', () => {
   it('a run moves the opportunity to running, collects events in order and records its spend', async () => {
     const o = await repo.createOpportunity(ME, 'x')

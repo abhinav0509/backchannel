@@ -23,6 +23,8 @@ export const claim = <T extends z.ZodType>(value: T) =>
     confidence: Confidence,
     evidence: z.array(EvidenceRef).min(1, 'a claim needs at least one evidence reference'),
     as_of: PartialDate.nullable(),
+    // Optional, not nullable: nullable would push the resolve schema past the API's grammar limit.
+    // Unconstrained output that writes note: null is read as no note (llm/evidence.ts).
     note: z.string().optional(),
   })
 export type Claim<T> = z.infer<ReturnType<typeof claim<z.ZodType<T>>>>
@@ -133,6 +135,47 @@ export const Role = z.object({
   extracted_requirements: z.array(z.string()),
 })
 
+export const Person = z.object({
+  name: z.string(),
+  role: z.string(),
+  background: z.string().nullable(), // as a source describes it: prior companies, expertise
+  since: PartialDate.nullable(),
+})
+
+/** What the company does and who runs it (the business stage). */
+export const Business = z.object({
+  summary: claim(z.string()).nullable(), // what they do, in plain words
+  products: z.array(claim(z.object({ name: z.string(), description: z.string() }))),
+  customers: claim(z.string()).nullable(), // who pays
+  business_model: claim(z.string()).nullable(),
+  competitors: z.array(claim(z.string())),
+  founders: z.array(claim(Person.extend({ still_involved: z.boolean().nullable() }))),
+  leaders: z.array(claim(Person)), // current executives, and heads of product, design and engineering
+})
+
+// How central AI is to the company, as its own products and statements show it.
+export const AiStance = z.enum(['ai_native', 'ai_core', 'ai_adopting', 'ai_peripheral', 'none'])
+
+/** Where it stands on AI and where it is heading (the market stage). */
+export const Market = z.object({
+  ai_stance: claim(AiStance).nullable(),
+  ai_summary: claim(z.string()).nullable(),
+  ai_initiatives: z.array(claim(z.object({ title: z.string(), detail: z.string(), date: PartialDate.nullable() }))),
+  strategy: claim(z.string()).nullable(), // direction the company itself states
+  recent_news: z.array(claim(z.object({ date: PartialDate.nullable(), headline: z.string() }))),
+  tailwinds: z.array(claim(z.string())),
+  headwinds: z.array(claim(z.string())),
+})
+
+export const QuestionTopic = z.enum(['role', 'team', 'company', 'money', 'future', 'ai', 'culture', 'comp'])
+
+/** An interview question, why it is worth asking, and what it is about. */
+export const Question = z.object({
+  question: z.string().min(1),
+  why: z.string().min(1), // the finding or gap behind it
+  topic: QuestionTopic,
+})
+
 export const StageStatus = z.enum(['ok', 'partial', 'failed'])
 
 export const Run = z.object({
@@ -169,11 +212,17 @@ export const CompanyResearch = z.object({
     review_scores: z.array(claim(ReviewScore)),
   }),
 
+  // Reports from before these stages existed read back as null and [].
+  business: Business.nullable().default(null),
+  market: Market.nullable().default(null),
+
   role: Role,
   flags: z.array(Flag),
   scores: z.array(Score),
-  questions_to_ask: z.array(z.string()).max(10), // 6 to 10 enforced on stage 8 output; empty only if stage 8 failed
+  questions_to_ask: z.array(z.string()).max(12), // the question text, kept for exports and older reports
+  questions: z.array(Question).max(12).default([]),
   verdict: z.string(),
+  outlook: z.string().nullable().default(null), // synthesis's read on where the company is heading, labelled as a read
   gaps: z.array(z.string()),
   run: Run,
 })
@@ -201,6 +250,11 @@ export const TriageResult = z.object({
 })
 
 export type EvidenceRef = z.infer<typeof EvidenceRef>
+export type Business = z.infer<typeof Business>
+export type Market = z.infer<typeof Market>
+export type Question = z.infer<typeof Question>
+export type QuestionTopic = z.infer<typeof QuestionTopic>
+export type AiStance = z.infer<typeof AiStance>
 export type FundingEvent = z.infer<typeof FundingEvent>
 export type LayoffEvent = z.infer<typeof LayoffEvent>
 export type LeadershipChange = z.infer<typeof LeadershipChange>

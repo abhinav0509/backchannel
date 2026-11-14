@@ -86,7 +86,8 @@ export function validateSourced<S extends z.ZodType>(text: string, schema: S, re
   try {
     // Unconstrained output can arrive fenced or with a sentence around it; take the outer object.
     const start = text.indexOf('{')
-    raw = JSON.parse(start === -1 ? text : text.slice(start, text.lastIndexOf('}') + 1))
+    // note: null means no note. Models write it in unconstrained output, and rejecting it once threw away a whole stage.
+    raw = JSON.parse(start === -1 ? text : text.slice(start, text.lastIndexOf('}') + 1), (k, v: unknown) => (k === 'note' && v === null ? undefined : v))
   } catch (err) {
     return { ok: false, issues: `not valid JSON: ${err instanceof Error ? err.message : String(err)}` }
   }

@@ -37,7 +37,66 @@ export function toMarkdown(r: CompanyResearch): string {
   }
   const score = (s: Score) => `| ${label(s.dimension)} | ${s.unknown ? 'Unknown' : Math.round(s.value)} | ${s.rationale}${refs(s.evidence_urls)} |`
 
-  const { identity: id, money, people, role, run } = r
+  const { identity: id, money, people, role, run, business: biz, market: mkt } = r
+  const person = (p: { name: string; role: string; since: string | null; background: string | null; still_involved?: boolean | null }) =>
+    [p.name, p.role, p.since && `since ${p.since}`, p.still_involved === true ? 'still involved' : p.still_involved === false ? 'no longer involved' : null, p.background]
+      .filter(Boolean)
+      .join(', ')
+  const questions = r.questions.length
+    ? r.questions.map((q, i) => `${i + 1}. ${q.question}\n   Why: ${q.why}`).join('\n')
+    : r.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n') || 'None generated.'
+  const businessSection = biz
+    ? `
+## What they do
+
+${claim(biz.summary)}
+
+- Customers: ${claim(biz.customers)}
+- Business model: ${claim(biz.business_model)}
+
+### Products
+
+${claims(biz.products, (p) => `${p.name}: ${p.description}`)}
+
+### Competitors
+
+${claims(biz.competitors, String)}
+
+### Founders
+
+${claims(biz.founders, person)}
+
+### Leadership
+
+${claims(biz.leaders, person)}
+`
+    : ''
+  const marketSection = mkt
+    ? `
+## AI
+
+- Stance: ${claim(mkt.ai_stance, (v) => label(v).replace(/^Ai/, 'AI'))}
+- ${claim(mkt.ai_summary)}
+
+${claims(mkt.ai_initiatives, (a) => [a.date, a.title, a.detail].filter(Boolean).join(': '))}
+
+## Outlook
+
+${r.outlook ? `Our read: ${r.outlook}\n\n` : ''}- Strategy: ${claim(mkt.strategy)}
+
+### Recent news
+
+${claims(mkt.recent_news, (n) => (n.date ? `${n.date}: ${n.headline}` : n.headline))}
+
+### Tailwinds
+
+${claims(mkt.tailwinds, String)}
+
+### Headwinds
+
+${claims(mkt.headwinds, String)}
+`
+    : ''
   const meta = [
     r.generated_at.slice(0, 10),
     run.mode,
@@ -71,8 +130,8 @@ ${flags('green')}
 
 ## Questions to ask
 
-${r.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n') || 'None generated.'}
-
+${questions}
+${businessSection}${marketSection}
 ## Company
 
 - Legal name: ${claim(id.legal_name)}

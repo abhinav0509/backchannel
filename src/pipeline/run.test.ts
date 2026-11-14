@@ -4,12 +4,14 @@ import { CompanyResearch, TriageResult } from '../types/research'
 import type { RunEvent } from './run'
 
 const m = vi.hoisted(() => ({
-  parse: vi.fn(), resolve: vi.fn(), money: vi.fn(), people: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
+  parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
 }))
 vi.mock('./stage0-parse', () => ({ parse: m.parse }))
 vi.mock('./stage1-resolve', async (orig) => ({ ...(await orig<typeof import('./stage1-resolve')>()), resolve: m.resolve }))
+vi.mock('./stage2-business', () => ({ business: m.business }))
 vi.mock('./stage3-money', () => ({ money: m.money }))
 vi.mock('./stage4-people', () => ({ people: m.people }))
+vi.mock('./stage5-market', () => ({ market: m.market }))
 vi.mock('./stage8-synthesize', () => ({ synthesize: m.synthesize }))
 vi.mock('./stage-triage', () => ({ triage: m.triage }))
 vi.mock('../util/cost', async (orig) => {
@@ -26,7 +28,10 @@ const role = { title: 'Designer', level_claimed: null, location: null, work_poli
 const parsed = { company_name: 'Example', domain_guess: null, role, recruiter: { name: null, email: null, agency: null }, comp_hint: null }
 const moneyOut = { ownership_type: c('vc_backed'), funding_events: [], revenue_signal: null, profitability: null, exit_activity: [], gaps: ['no revenue'] }
 const peopleOut = { headcount: null, headcount_trend: null, layoff_events: [], leadership_changes: [], review_scores: [], gaps: ['no reviews'] }
-const synthOut = { flags: [], scores: [], questions_to_ask: ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'], verdict: 'Fine.', gaps: ['no reviews', 'no comp'] }
+const businessOut = { summary: c('Makes things.'), products: [], customers: null, business_model: null, competitors: [], founders: [], leaders: [], gaps: [] }
+const marketOut = { ai_stance: c('ai_core'), ai_summary: null, ai_initiatives: [], strategy: null, recent_news: [], tailwinds: [], headwinds: [], gaps: ['no news'] }
+const questions = ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'].map((q) => ({ question: q, why: 'w', topic: 'role' }))
+const synthOut = { flags: [], scores: [], questions, verdict: 'Fine.', outlook: 'Steady.', gaps: ['no reviews', 'no comp'] }
 
 const ok = <T>(data: T, extra = {}) => ({ data, dropped: [], searchCapped: false, ...extra })
 
@@ -36,6 +41,8 @@ beforeEach(() => {
   m.resolve.mockResolvedValue({ out: { candidates: [], identity, gaps: [] }, dropped: [] })
   m.money.mockResolvedValue(ok(moneyOut))
   m.people.mockResolvedValue(ok(peopleOut))
+  m.business.mockResolvedValue(ok(businessOut))
+  m.market.mockResolvedValue(ok(marketOut))
   m.synthesize.mockResolvedValue({ data: synthOut, dropped: [] })
   m.triage.mockResolvedValue(ok({ flags: [], deep_dive: { recommended: true, reason: 'layoffs' }, gaps: ['thin'] }))
 })
@@ -46,9 +53,21 @@ describe('deep run', () => {
     if (o.kind !== 'report') throw new Error(o.kind)
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report.partial).toBe(false)
-    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', money: 'ok', people: 'ok', synthesize: 'ok' })
+    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', business: 'ok', money: 'ok', people: 'ok', market: 'ok', synthesize: 'ok' })
     expect(o.report.money.ownership_type?.value).toBe('vc_backed')
-    expect(o.report.gaps).toEqual(['no reviews', 'no comp', 'no revenue'])
+    expect(o.report.business?.summary?.value).toBe('Makes things.')
+    expect(o.report.market?.ai_stance?.value).toBe('ai_core')
+    expect(o.report).toMatchObject({ outlook: 'Steady.', questions_to_ask: ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] })
+    expect(o.report.questions[0]).toEqual({ question: 'q1', why: 'w', topic: 'role' })
+    expect(o.report.gaps).toEqual(['no reviews', 'no comp', 'no revenue', 'no news'])
+  })
+
+  it('a failed business or market stage leaves its section empty, not the report', async () => {
+    m.market.mockRejectedValue(new Error('boom'))
+    const o = await runResearch({ text: 't', mode: 'deep', profile: null })
+    if (o.kind !== 'report') throw new Error(o.kind)
+    expect(o.report).toMatchObject({ partial: true, market: null, run: { stage_status: { market: 'failed', business: 'ok' } } })
+    expect(o.report.business).not.toBeNull()
   })
 
   it('runs money and people in parallel', async () => {

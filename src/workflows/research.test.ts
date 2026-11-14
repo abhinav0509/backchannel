@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTestDb } from '../db/db'
 import { CompanyResearch, TriageResult } from '../types/research'
 
-const m = vi.hoisted(() => ({ parse: vi.fn(), resolve: vi.fn(), money: vi.fn(), people: vi.fn(), synthesize: vi.fn(), triage: vi.fn() }))
+const m = vi.hoisted(() => ({ parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), synthesize: vi.fn(), triage: vi.fn() }))
 vi.mock('../pipeline/stage0-parse', () => ({ parse: m.parse }))
 vi.mock('../pipeline/stage1-resolve', async (orig) => ({ ...(await orig<typeof import('../pipeline/stage1-resolve')>()), resolve: m.resolve }))
+vi.mock('../pipeline/stage2-business', () => ({ business: m.business }))
 vi.mock('../pipeline/stage3-money', () => ({ money: m.money }))
 vi.mock('../pipeline/stage4-people', () => ({ people: m.people }))
+vi.mock('../pipeline/stage5-market', () => ({ market: m.market }))
 vi.mock('../pipeline/stage8-synthesize', () => ({ synthesize: m.synthesize }))
 vi.mock('../pipeline/stage-triage', () => ({ triage: m.triage }))
 
@@ -20,7 +22,9 @@ const parsed = { company_name: 'Example', domain_guess: null, role: r.role, recr
 const resolved = { out: { candidates: [], identity: r.identity, gaps: ['no founding year'] }, dropped: [] }
 const moneyOut = { ...r.money, gaps: ['no revenue'] }
 const peopleOut = { ...r.people, gaps: [] }
-const synthOut = { flags: [], scores: [], questions_to_ask: ['1', '2', '3', '4', '5', '6'], verdict: 'Fine.', gaps: ['no comp'] }
+const businessOut = { summary: null, products: [], customers: null, business_model: null, competitors: [], founders: [], leaders: [], gaps: [] }
+const marketOut = { ai_stance: null, ai_summary: null, ai_initiatives: [], strategy: null, recent_news: [], tailwinds: [], headwinds: [], gaps: [] }
+const synthOut = { flags: [], scores: [], questions: ['1', '2', '3', '4', '5', '6'].map((q) => ({ question: q, why: 'w', topic: 'role' })), verdict: 'Fine.', outlook: 'o', gaps: ['no comp'] }
 const ok = <T>(data: T) => ({ data, dropped: [], searchCapped: false })
 
 async function setup(mode: 'triage' | 'deep', companyDomain?: string) {
@@ -36,6 +40,8 @@ beforeEach(async () => {
   m.resolve.mockResolvedValue(resolved)
   m.money.mockResolvedValue(ok(moneyOut))
   m.people.mockResolvedValue(ok(peopleOut))
+  m.business.mockResolvedValue(ok(businessOut))
+  m.market.mockResolvedValue(ok(marketOut))
   m.synthesize.mockResolvedValue({ data: synthOut, dropped: [] })
   m.triage.mockResolvedValue(ok({ flags: [], deep_dive: { recommended: true, reason: 'layoffs' }, gaps: [] }))
 })
@@ -48,7 +54,7 @@ describe('researchWorkflow', () => {
     expect(o).toMatchObject({ status: 'done', domain: 'example.com', company: 'Example' })
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report!.gaps.slice(0, 2)).toEqual(['no comp', 'no founding year'])
-    expect(o.events.map((e) => `${e.stage}:${e.status}`)).toEqual(expect.arrayContaining(['parse:ok', 'resolve:ok', 'money:ok', 'people:ok', 'synthesize:ok']))
+    expect(o.events.map((e) => `${e.stage}:${e.status}`)).toEqual(expect.arrayContaining(['parse:ok', 'resolve:ok', 'business:ok', 'money:ok', 'people:ok', 'market:ok', 'synthesize:ok']))
     expect(o.runs[0]).toMatchObject({ status: 'done' })
   })
 

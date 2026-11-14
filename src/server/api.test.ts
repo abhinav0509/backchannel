@@ -31,6 +31,17 @@ describe('create', () => {
     expect(start).not.toHaveBeenCalled()
   })
 
+  it('researches a company by name, with or without its website', async () => {
+    const r = await api.create(ME, { company: 'Example Labs', website: 'https://www.example.com/about', mode: 'deep' })
+    expect(r.status).toBe(201)
+    const text = (start.mock.calls[0]![1] as [{ text: string }])[0].text
+    expect(text).toContain('Example Labs')
+    expect(text).toContain('example.com')
+    expect((await api.create(ME, { company: 'Example Labs', mode: 'triage' })).status).toBe(201)
+    expect((await api.create(ME, { company: ' ', mode: 'triage' })).status).toBe(400)
+    expect((await api.create(ME, { company: 'X', website: 'not a site', mode: 'triage' })).status).toBe(400)
+  })
+
   it('marks the run failed if the workflow cannot be started', async () => {
     start.mockRejectedValueOnce(new Error('queue down'))
     const r = await api.create(ME, { text: 'x', mode: 'triage' })
@@ -100,6 +111,34 @@ describe('get and list', () => {
     const list = (await api.list(ME)).body as Summary[]
     expect(list.find((x) => x.id === a.id)).toMatchObject({ depth: 'triage', recommendation: 'deep', headline: 'Placeholder reason.' })
     expect(list.find((x) => x.id === b.id)).toMatchObject({ status: 'running', stage: 'money' })
+  })
+})
+
+describe('track and remove', () => {
+  it('updates the stage and notes for the owner only, and validates the body', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.track(ME, o.id, { pipeline: 'back_pocket', notes: 'Revisit in spring.' })).status).toBe(200)
+    expect(await repo.getOpportunity(ME, o.id)).toMatchObject({ pipeline: 'back_pocket', notes: 'Revisit in spring.' })
+    expect((await api.track(OTHER, o.id, { pipeline: 'offer' })).status).toBe(404)
+    expect((await api.track(ME, o.id, { pipeline: 'hired' })).status).toBe(400)
+    expect((await api.track(ME, o.id, 'nope')).status).toBe(400)
+  })
+
+  it('summaries carry the stage and next step for the inbox', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await api.track(ME, o.id, { pipeline: 'interviewing', next_step: 'Panel', next_step_at: '2026-11-20' })
+    const [s] = (await api.list(ME)).body as Summary[]
+    expect(s).toMatchObject({ pipeline: 'interviewing', next_step: 'Panel', next_step_at: '2026-11-20' })
+  })
+
+  it('deletes, but not while research is running, and 404s what is not yours', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const run = await repo.beginRun(ME, o.id, 'triage')
+    expect((await api.remove(ME, o.id)).status).toBe(409)
+    await repo.finishRun(ME, o.id, run, { status: 'failed', error: 'x' })
+    expect((await api.remove(OTHER, o.id)).status).toBe(404)
+    expect((await api.remove(ME, o.id)).status).toBe(204)
+    expect((await api.get(ME, o.id)).status).toBe(404)
   })
 })
 

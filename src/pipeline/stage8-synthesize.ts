@@ -3,7 +3,7 @@ import { MODELS } from '../config'
 import { collectEvidenceUrls } from '../llm/evidence'
 import { callStructured } from '../llm/call'
 import type { Profile } from '../types/profile'
-import { Flag, Score, ScoreDimension, type CompanyResearch } from '../types/research'
+import { Flag, Question, QuestionTopic, Score, ScoreDimension, type CompanyResearch } from '../types/research'
 import type { Budget } from '../util/cost'
 import { today } from './shared'
 
@@ -13,29 +13,33 @@ export const SynthOut = z.object({
     .array(Score)
     .length(6)
     .refine((s) => new Set(s.map((x) => x.dimension)).size === 6, 'each of the six dimensions exactly once'),
-  questions_to_ask: z.array(z.string()).min(6).max(10),
+  questions: z.array(Question).min(6).max(12),
   verdict: z.string().min(1),
+  outlook: z.string().min(1),
   gaps: z.array(z.string()),
 })
 export type SynthOut = z.infer<typeof SynthOut>
 
-export type Draft = Omit<CompanyResearch, 'flags' | 'scores' | 'questions_to_ask' | 'verdict'>
+export type Draft = Omit<CompanyResearch, 'flags' | 'scores' | 'questions_to_ask' | 'questions' | 'verdict' | 'outlook'>
 
 export const synthSystem = `You turn sourced company research into a decision aid for one candidate deciding whether to interview. Today is ${today()}.
 You are direct. You state the main risk plainly. You never add facts that are not in the research, and you never present an inference as a fact.`
 
 // Only the findings: run bookkeeping changes every run and would only add noise and bust the cache.
-const findings = ({ identity, money, people, role, gaps }: Draft) => ({ identity, money, people, role, gaps })
+const findings = ({ identity, business, money, people, market, role, gaps }: Draft) => ({ identity, business, money, people, market, role, gaps })
 
-export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK
-From the research below, produce:
+export const synthTask = `From the research below, produce:
 - flags: risk and green flags from this fixed taxonomy only: ${Flag.shape.kind.options.join(', ')}.
   basis "web" flags must copy their evidence entries exactly from the research. basis "profile" is only for judgements of the role against the candidate profile (domain_fit, level_mismatch, role_ambiguity, rare_role) and has empty evidence.
   Severity 1 to 5: 5 changes the decision on its own.
 - scores: exactly one per dimension (${ScoreDimension.options.join(', ')}), 0 to 100, with a one or two sentence rationale and the evidence URLs behind it (copied from the research). Set unknown true when there is not enough to judge; comp_confidence is unknown unless compensation is actually sourced.
-- questions_to_ask: 6 to 10 questions for the interview, each specific to something found or to a gap. No generic questions.
+- questions: 6 to 12 questions for the candidate to ask in interviews, each specific to something found or to a gap. No generic questions. For each: why, one sentence naming the finding or gap that makes it worth asking; topic, one of ${QuestionTopic.options.join(', ')}. Cover the role and team, not only the company.
 - verdict: 3 to 5 sentences. Lead with the main risk, stated plainly.
-- gaps: what could not be established and why it matters for this decision.
+- outlook: 2 to 4 sentences on where the company looks to be heading, drawn only from the research (strategy, news, money, AI, headwinds). It is read as your judgement, so reason from the findings and do not introduce new facts.
+- gaps: what could not be established and why it matters for this decision.`
+
+export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK
+${synthTask}
 
 CANDIDATE PROFILE
 ${profile ? JSON.stringify(profile, null, 2) : 'No candidate profile was provided. role_fit and career_signal cannot be judged against the candidate: mark them unknown and say so in gaps.'}

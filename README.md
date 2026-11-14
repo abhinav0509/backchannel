@@ -1,8 +1,12 @@
 # Backchannel
 
-Sourced due diligence on the companies that approach you. Paste a recruiter email; get the
-company's ownership, money, layoffs, leadership and employee sentiment, every fact linked to the
-source behind it, plus scores, risks and questions to ask.
+Sourced due diligence on the companies that approach you. Paste a recruiter email or name a
+company; get what it does, its founders and leaders, ownership and money, layoffs and employee
+sentiment, where it stands on AI and where it is heading, every fact linked to the source behind
+it. Then six scores, risks, and interview questions you can tick off as you ask them.
+
+Track each one through your search: New, Interested, Screening, Interviewing, Offer, Back pocket,
+On hold, Passed or Closed (with the reason), with a next step, a date and notes.
 
 ## Run it locally
 
@@ -28,6 +32,8 @@ From the terminal: `npm run dev -- research --file email.txt` (add `--deep` for 
    ```sh
    DATABASE_URL='postgresql://…:5432/postgres' npm run db:migrate
    ```
+   Run it again after pulling changes that add a file to `db/migrations`. It applies only what is
+   new, and migrations only ever add columns, so the running app keeps working while you do.
 3. **Vercel.** Import the GitHub repo (or run `vercel` in this folder) and set these environment
    variables for Production:
    | Name | Value |
@@ -44,7 +50,8 @@ The app refuses to run on Vercel without these variables, rather than run unprot
 ## How it is built
 
 - **Research pipeline** (`src/pipeline`): parse, identify the company (stops to ask when unsure),
-  ownership and money, people and leadership, then a synthesis with scores, flags and questions.
+  then four stages in parallel (what they do and who runs it; ownership and money; people and
+  leadership; AI and outlook), then a synthesis with scores, flags, an outlook read and questions.
   Every claim must cite a source the web search actually returned, or it is dropped and listed as a gap.
 - **Durable runs** (`src/workflows`): each stage is a separate, retried Vercel Workflow step, so a
   four-minute run survives the 300-second function limit, timeouts and redeploys.
@@ -54,7 +61,7 @@ The app refuses to run on Vercel without these variables, rather than run unprot
 
 ## What a run costs
 
-A quick check is about $0.30 and a minute. Full research is about $1.20 and four to six minutes.
+A quick check is about $0.30 and a minute. Full research is about $1.70 and four to six minutes.
 Repeat requests are served from the cache for free. Spend is capped at $20 a month
 (`src/config.ts`); new research stops at the cap.
 

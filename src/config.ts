@@ -9,5 +9,6 @@ export const MODELS = {
 export const BUDGETS = {
   monthlyUsd: 20, // no new run starts once this month's recorded spend reaches it
   triage: { searchesPerRun: 8, tokensPerRun: 200_000 },
-  deep: { searchesPerRun: 40, tokensPerRun: 600_000 },
+  // Four research stages (6 + 8 + 10 + 6 searches) and synthesis.
+  deep: { searchesPerRun: 40, tokensPerRun: 900_000 },
 } as const

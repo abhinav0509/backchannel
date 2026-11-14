@@ -30,7 +30,7 @@ describe('labels', () => {
   })
   it('lists the stages each mode runs, in order', () => {
     expect(stagesFor('triage')).toEqual(['parse', 'resolve', 'triage'])
-    expect(stagesFor('deep')).toEqual(['parse', 'resolve', 'money', 'people', 'synthesize'])
+    expect(stagesFor('deep')).toEqual(['parse', 'resolve', 'business', 'money', 'people', 'market', 'synthesize'])
   })
 })
 

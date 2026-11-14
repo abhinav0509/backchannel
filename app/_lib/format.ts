@@ -66,14 +66,16 @@ const STAGES: Partial<Record<StageName, string>> = {
   parse: 'Reading the email',
   resolve: 'Identifying the company',
   triage: 'Quick check for red flags',
+  business: 'What they do and who runs it',
   money: 'Ownership and money',
   people: 'People and leadership',
-  synthesize: 'Weighing it up',
+  market: 'AI and where it is heading',
+  synthesize: 'Weighing it up and writing your questions',
 }
 export const stageLabel = (s: StageName) => STAGES[s] ?? s
 
 export const stagesFor = (mode: 'triage' | 'deep'): StageName[] =>
-  mode === 'triage' ? ['parse', 'resolve', 'triage'] : ['parse', 'resolve', 'money', 'people', 'synthesize']
+  mode === 'triage' ? ['parse', 'resolve', 'triage'] : ['parse', 'resolve', 'business', 'money', 'people', 'market', 'synthesize']
 
 /** First sentence and the rest. A sentence ends at . ! or ? followed by a space and a capital letter. */
 export function splitLead(text: string): [string, string] {

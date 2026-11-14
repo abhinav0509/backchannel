@@ -12,8 +12,7 @@ const POLICIES = [
   { value: 'onsite', label: 'On site' },
 ] as const
 
-const field =
-  'mt-1.5 block w-full rounded-xl border border-line bg-surface px-3.5 py-2.5 text-[17px] outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent/60 focus:shadow-[0_0_0_4px_var(--accent-soft)]'
+const field = 'field mt-1.5'
 
 function Field({ id, label, hint, children }: { id: string; label: string; hint?: string; children: React.ReactNode }) {
   return (
@@ -70,16 +69,16 @@ export function ProfileForm({ initial }: { initial: Profile | null }) {
   }
 
   return (
-    <form onSubmit={save} className="max-w-[760px] pt-14">
+    <form onSubmit={save} className="max-w-[760px] pt-8 lg:pt-10">
       <h1 className="t-display">Your profile</h1>
-      <p className="t-lede mt-2 max-w-[44ch] text-ink-2">Role fit and career signal are judged against this. Without it, those two scores stay unknown.</p>
+      <p className="mt-2 max-w-[52ch] text-ink-2">Role fit and career signal are judged against this. Without it, those two scores stay unknown.</p>
 
-      <div className="mt-10 divide-y divide-line-soft border-y border-line-soft">
+      <div className="card mt-8 divide-y divide-line-soft px-5">
         <Field id="headline" label="Headline" hint="One line on what you do.">
           <input id="headline" required value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="Senior product designer, AI and developer tools" className={field} />
         </Field>
         <Field id="years" label="Years of experience">
-          <input id="years" required inputMode="decimal" value={years} onChange={(e) => setYears(e.target.value.replace(/[^\d.]/g, ''))} className={`${field.replace("w-full", "")} w-28 tabular-nums`} />
+          <input id="years" required inputMode="decimal" value={years} onChange={(e) => setYears(e.target.value.replace(/[^\d.]/g, ''))} className={`${field} w-28 tabular-nums`} />
         </Field>
         <Field id="level" label="Current level" hint="And the levels you would move to.">
           <input id="level" value={level} onChange={(e) => setLevel(e.target.value)} placeholder="Senior" className={field} />
@@ -121,9 +120,9 @@ export function ProfileForm({ initial }: { initial: Profile | null }) {
           <span className={`t-small tabular-nums ${total === 100 ? 'text-ink-3' : 'text-amber'}`}>{total} of 100</span>
         </div>
         <p className="mt-1 max-w-[56ch] t-small text-ink-3">How much each score should count when you compare opportunities. Job security matters more on a contract than it will in two years; change it as your situation does.</p>
-        <ul className="mt-5 border-t border-line-soft">
+        <ul className="card mt-5 px-5">
           {DIMENSION_ORDER.map((d) => (
-            <li key={d} className="grid grid-cols-[8.5rem_1fr_2.5rem] items-center gap-4 border-b border-line-soft py-3 sm:grid-cols-[11rem_1fr_3rem]">
+            <li key={d} className="grid grid-cols-[8.5rem_1fr_2.5rem] items-center gap-4 border-b border-line-soft py-3 last:border-0 sm:grid-cols-[11rem_1fr_3rem]">
               <label htmlFor={`w-${d}`} className="font-medium">
                 {dimensionLabel(d)}
               </label>

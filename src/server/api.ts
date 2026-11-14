@@ -5,6 +5,7 @@ import { toMarkdown, triageToMarkdown } from '../report/markdown'
 import * as repo from '../store/repo'
 import type { Opportunity } from '../store/repo'
 import { Domain, type Flag, type ScoreDimension, type StageName } from '../types/research'
+import { TrackingPatch, type Pipeline, type PipelineReason } from '../types/tracking'
 import { slug } from '../util/slug'
 import { researchWorkflow, type Ctx } from '../workflows/research'
 
@@ -17,7 +18,26 @@ const invalid = (e: z.ZodError) => reply(400, { error: e.issues.map((i) => `${i.
 const notFound = () => reply(404, { error: 'No opportunity with that id.' })
 
 const Mode = z.enum(['triage', 'deep'])
-const CreateBody = z.object({ text: z.string().trim().min(1, 'paste the email or job description').max(60_000), mode: Mode })
+/** "https://www.Example.com/about" → "example.com"; anything that is not a site fails. */
+const Website = z
+  .string()
+  .trim()
+  .transform((s) => {
+    try {
+      return new URL(/^https?:\/\//i.test(s) ? s : `https://${s}`).hostname.toLowerCase().replace(/^www\./, '')
+    } catch {
+      return ''
+    }
+  })
+  .pipe(Domain)
+const CreateBody = z.union([
+  z.object({ text: z.string().trim().min(1, 'paste the email or job description').max(60_000), mode: Mode }),
+  z.object({ company: z.string().trim().min(1, 'name the company').max(200), website: Website.optional(), mode: Mode }),
+])
+
+/** A company added by name gets a short brief in place of an email, so the same pipeline researches it. */
+const byName = (company: string, website?: string) =>
+  `Research this company. It was added by name: there is no recruiter email and no specific role yet.\nCompany: ${company}${website ? `\nWebsite: ${website}` : ''}`
 const RunBody = z.object({ mode: Mode, companyDomain: Domain.optional() })
 
 /** A row in the inbox. Scores keep their six parts: the PRD forbids one blended number. */
@@ -35,6 +55,12 @@ export interface Summary {
   scores: { dimension: ScoreDimension; value: number; unknown: boolean }[]
   flags: Pick<Flag, 'kind' | 'polarity' | 'severity' | 'title'>[]
   cost_usd: number
+  domain: string | null
+  pipeline: Pipeline
+  pipeline_reason: PipelineReason | null
+  pipeline_at: string
+  next_step: string | null
+  next_step_at: string | null
 }
 
 const firstSentence = (s: string) => s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s
@@ -58,6 +84,12 @@ function summarise(o: Opportunity): Summary {
       .slice(0, 2)
       .map(({ kind, polarity, severity, title }) => ({ kind, polarity, severity, title })),
     cost_usd: o.runs.reduce((sum, r) => sum + r.cost_usd, 0),
+    domain: o.report?.identity.domain ?? o.triage?.identity.domain ?? o.domain,
+    pipeline: o.pipeline,
+    pipeline_reason: o.pipeline_reason,
+    pipeline_at: o.pipeline_at,
+    next_step: o.next_step,
+    next_step_at: o.next_step_at,
   }
 }
 
@@ -85,8 +117,13 @@ async function launch(owner: string, o: Opportunity, mode: 'triage' | 'deep', co
 export async function create(owner: string, body: unknown): Promise<Reply> {
   const b = CreateBody.safeParse(body)
   if (!b.success) return invalid(b.error)
-  const o = await repo.createOpportunity(owner, b.data.text)
-  return (await launch(owner, o, b.data.mode)) ?? reply(201, { id: o.id })
+  if ('text' in b.data) {
+    const o = await repo.createOpportunity(owner, b.data.text)
+    return (await launch(owner, o, b.data.mode)) ?? reply(201, { id: o.id })
+  }
+  const o = await repo.createOpportunity(owner, byName(b.data.company, b.data.website))
+  await repo.patchOpportunity(owner, o.id, { company: b.data.company })
+  return (await launch(owner, o, b.data.mode, b.data.website)) ?? reply(201, { id: o.id })
 }
 
 export async function run(owner: string, id: string, body: unknown): Promise<Reply> {
@@ -96,6 +133,23 @@ export async function run(owner: string, id: string, body: unknown): Promise<Rep
   if (!b.success) return invalid(b.error)
   if (o.status === 'running') return reply(409, { error: 'Research is already running for this opportunity.' })
   return (await launch(owner, o, b.data.mode, b.data.companyDomain ?? o.domain ?? undefined)) ?? reply(202, { id })
+}
+
+export async function track(owner: string, id: string, body: unknown): Promise<Reply> {
+  const b = TrackingPatch.safeParse(body)
+  if (!b.success) return invalid(b.error)
+  if (!(await repo.getOpportunity(owner, id))) return notFound()
+  await repo.updateTracking(owner, id, b.data)
+  return reply(200, await repo.getOpportunity(owner, id))
+}
+
+/** Running research would keep spending and then write to a row that no longer exists, so it must finish first. */
+export async function remove(owner: string, id: string): Promise<Reply> {
+  const o = await repo.getOpportunity(owner, id)
+  if (!o) return notFound()
+  if (o.status === 'running') return reply(409, { error: 'Research is still running. Delete it once it finishes.' })
+  await repo.deleteOpportunity(owner, id)
+  return reply(204, null)
 }
 
 export async function markdown(owner: string, id: string): Promise<Reply & { filename?: string }> {

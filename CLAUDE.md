@@ -10,6 +10,10 @@ Pipeline plus web app (Next.js in `app/`), deployed on Vercel with Supabase. Pos
 durable Vercel Workflow steps (`src/workflows`); the CLI runs in-process (`src/store/runner.ts`).
 Work test-first: write the failing test, then the code.
 
+Your pipeline stage (`src/types/tracking.ts`: New to Closed, with a reason when passing or closing),
+notes, next step and prep answers are edited by hand and live on the opportunity row, apart from
+research. Deep runs: business, money, people and market stages in parallel, then synthesis.
+
 ## Principles that override convenience
 
 1. **Evidence or it is dropped.** Every factual claim carries at least one source URL with a
@@ -37,8 +41,12 @@ Work test-first: write the failing test, then the code.
 - Every API request is cached by a hash of the full request (`llm/client.ts`), which carries the
   domain, stage prompt and date. A prompt change invalidates its own entries only. `--fresh` bypasses.
 - Search uses `web_search_20250305` on purpose: newer versions returned text without citations.
-- Money and people extraction runs unconstrained (`constrained: false`): their schemas exceed the
-  API's structured-output grammar limit.
+- Business, money, people and market extraction run unconstrained (`constrained: false`): their
+  schemas exceed the API's structured-output grammar limit. Constrained schemas (parse, resolve,
+  triage, synthesis) are near that limit too: probe the API after widening any of them, because
+  unit tests mock it. A claim's `note` stays optional, not nullable, for this reason.
+- A client module (`'use client'`) cannot export constants to server code: Next hands the server a
+  reference. Shared constants live in plain modules (`app/_lib`, `src/types/pipeline.ts`).
 - Log structured JSON to stderr, human-readable summary to stdout.
 
 ## Testing

@@ -29,6 +29,15 @@ describe('stripUnretrieved', () => {
 })
 
 describe('validateSourced', () => {
+  it('reads note: null as no note, rather than failing the claim', async () => {
+    const { claim } = await import('../types/research')
+    const { z } = await import('zod')
+    const ev = { url: GOOD, title: 't', publisher: null, published_at: null, retrieved_at: '2026-11-13T00:00:00.000Z', snippet: 's', trust_tier: 'secondary' }
+    const r = validateSourced(JSON.stringify({ c: { value: 'x', confidence: 'reported', evidence: [ev], as_of: null, note: null } }), z.object({ c: claim(z.string()) }), [GOOD])
+    expect(r).toMatchObject({ ok: true, data: { c: { value: 'x' } } })
+    expect(r.ok && 'note' in r.data.c).toBe(false)
+  })
+
   const base = () => ({ hq: c('x', [GOOD]), revenue: null, layoffs: [], flags: [], gaps: [] })
 
   it('passes clean output through', () => {

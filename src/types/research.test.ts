@@ -46,6 +46,9 @@ describe('claims', () => {
     expect(StringClaim.safeParse({ ...c('x'), as_of: '2023' }).success).toBe(true)
     expect(StringClaim.safeParse({ ...c('x'), as_of: 'March 2023' }).success).toBe(false)
   })
+  it('keeps note optional, not nullable: nullable pushed the resolve schema past the grammar limit', () => {
+    expect(StringClaim.safeParse({ ...c('x'), note: null }).success).toBe(false)
+  })
 })
 
 describe('CompanyResearch', () => {
@@ -66,10 +69,17 @@ describe('CompanyResearch', () => {
     r.identity.domain = 'https://example.com'
     expect(CompanyResearch.safeParse(r).success).toBe(false)
   })
-  it('rejects more than ten questions', () => {
+  it('rejects more than twelve questions', () => {
     const r = research()
-    r.questions_to_ask = Array.from({ length: 11 }, (_, i) => `q${i}`)
+    r.questions_to_ask = Array.from({ length: 13 }, (_, i) => `q${i}`)
     expect(CompanyResearch.safeParse(r).success).toBe(false)
+  })
+})
+
+describe('reports made before business, market and structured questions existed', () => {
+  it('still parse, reading the new sections as empty', () => {
+    const r = CompanyResearch.parse(research()) // the fixture predates these fields
+    expect(r).toMatchObject({ business: null, market: null, questions: [], outlook: null })
   })
 })
 

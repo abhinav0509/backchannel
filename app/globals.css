@@ -1,31 +1,38 @@
 @import 'tailwindcss';
 
 /*
-  Backchannel design tokens.
-  One accent (ink blue) for action; red and green only ever mean risk and in-favour.
-  Everything else is neutral so the evidence markers are the one thing that stands out.
+  Backchannel tokens.
+  A cool, quiet base so evidence and signal carry the colour. One accent, signal violet, for
+  action and focus. Red, green and amber only ever mean risk, in-favour and parked. Sky marks
+  momentum in the pipeline. Nothing else is coloured.
 */
 :root {
-  --canvas: #fbfbfd;
+  --canvas: #f3f4f6;
   --surface: #ffffff;
-  --sunken: #f2f2f5;
-  --ink: #1d1d1f;
-  --ink-2: #515154;
-  --ink-3: #86868b;
-  --line: #d2d2d7;
-  --line-soft: #e8e8ed;
-  --accent: #3550d6;
+  --raised: #fbfbfc;
+  --sunken: #eceef1;
+  --ink: #15171c;
+  --ink-2: #4b505b;
+  --ink-3: #858b96;
+  --line: #dadde3;
+  --line-soft: #e7e9ed;
+  --line-strong: #b9bec7;
+  --accent: #4a2be8;
   --accent-ink: #ffffff;
-  --accent-soft: #eef1fd;
-  --risk: #c2384f;
-  --risk-soft: #fbeef0;
-  --green: #1e8a5a;
-  --green-soft: #ebf6f0;
-  --amber: #a36100;
+  --accent-soft: #eeeafe;
+  --risk: #cf3a2f;
+  --risk-soft: #fdeceb;
+  --green: #128459;
+  --green-soft: #e6f4ee;
+  --amber: #b26a00;
+  --amber-soft: #fbf1e1;
+  --sky: #1f6fd1;
+  --sky-soft: #e7f0fb;
+  --shadow-1: 0 1px 2px rgba(21, 23, 28, 0.06), 0 0 0 1px rgba(21, 23, 28, 0.04);
+  --shadow-pop: 0 18px 48px -16px rgba(21, 23, 28, 0.28), 0 4px 10px -4px rgba(21, 23, 28, 0.1), 0 0 0 1px rgba(21, 23, 28, 0.05);
 
-  /* Motion: strong ease-out for things that respond to a person; nothing linear, nothing bouncy. */
+  /* Motion: strong ease-out for things that answer a person; nothing linear, nothing bouncy. */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
-  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --t-fast: 140ms;
   --t-base: 200ms;
   color-scheme: light;
@@ -33,22 +40,29 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #000000;
-    --surface: #161617;
-    --sunken: #1d1d1f;
-    --ink: #f5f5f7;
-    --ink-2: #c7c7cc;
-    --ink-3: #8e8e93;
-    --line: #38383a;
-    --line-soft: #2c2c2e;
-    --accent: #7b8ff0;
-    --accent-ink: #0b1030;
-    --accent-soft: #1b2142;
-    --risk: #ff6b81;
-    --risk-soft: #3a1a20;
-    --green: #4cc38a;
-    --green-soft: #12291e;
-    --amber: #f0a43a;
+    --canvas: #0d0e11;
+    --surface: #15171b;
+    --raised: #191b20;
+    --sunken: #1c1f24;
+    --ink: #f2f3f5;
+    --ink-2: #b7bcc6;
+    --ink-3: #7d838e;
+    --line: #2c3037;
+    --line-soft: #22252b;
+    --line-strong: #4a4f58;
+    --accent: #9c8cff;
+    --accent-ink: #120c33;
+    --accent-soft: #221c45;
+    --risk: #ff7a70;
+    --risk-soft: #3a1714;
+    --green: #3fcb8e;
+    --green-soft: #0f2a1f;
+    --amber: #f2b04a;
+    --amber-soft: #33240b;
+    --sky: #6aa8ff;
+    --sky-soft: #132741;
+    --shadow-1: 0 0 0 1px rgba(255, 255, 255, 0.06);
+    --shadow-pop: 0 18px 48px -16px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08);
     color-scheme: dark;
   }
 }
@@ -56,12 +70,14 @@
 @theme inline {
   --color-canvas: var(--canvas);
   --color-surface: var(--surface);
+  --color-raised: var(--raised);
   --color-sunken: var(--sunken);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
   --color-ink-3: var(--ink-3);
   --color-line: var(--line);
   --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
@@ -70,7 +86,10 @@
   --color-green: var(--green);
   --color-green-soft: var(--green-soft);
   --color-amber: var(--amber);
-  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'SF Pro Display', system-ui, 'Helvetica Neue', sans-serif;
+  --color-amber-soft: var(--amber-soft);
+  --color-sky: var(--sky);
+  --color-sky-soft: var(--sky-soft);
+  --font-sans: var(--font-grotesk), -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   --ease-out: var(--ease-out);
 }
 
@@ -78,11 +97,16 @@ html {
   background: var(--canvas);
   color: var(--ink);
   font-family: var(--font-sans);
-  font-size: 17px;
-  line-height: 1.47;
-  letter-spacing: -0.022em;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: -0.006em;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  font-feature-settings: 'ss01', 'cv11';
+}
+
+body {
+  background: var(--canvas);
 }
 
 ::selection {
@@ -95,37 +119,50 @@ html {
   border-radius: 6px;
 }
 
-/* Display type: tighter tracking as size grows (SF's optical behaviour, applied by hand). */
+/* Component classes sit in the components layer, so Tailwind utilities on an element still win. */
+@layer components {
+/* Type scale: a 1.25 ratio from 16px, tracking tightens as size grows. */
+.t-hero {
+  font-size: clamp(36px, 5vw, 52px);
+  line-height: 1.02;
+  letter-spacing: -0.045em;
+  font-weight: 700;
+}
 .t-display {
-  font-size: 40px;
+  font-size: 32px;
   line-height: 1.1;
   letter-spacing: -0.035em;
-  font-weight: 650;
+  font-weight: 700;
 }
 .t-title {
-  font-size: 24px;
-  line-height: 1.2;
-  letter-spacing: -0.028em;
-  font-weight: 620;
+  font-size: 20px;
+  line-height: 1.25;
+  letter-spacing: -0.022em;
+  font-weight: 650;
 }
 .t-lede {
-  font-size: 21px;
-  line-height: 1.45;
-  letter-spacing: -0.024em;
+  font-size: 22px;
+  line-height: 1.38;
+  letter-spacing: -0.022em;
+  font-weight: 500;
+}
+.t-body {
+  font-size: 16px;
+  line-height: 1.55;
 }
 .t-small {
   font-size: 14px;
-  line-height: 1.43;
-  letter-spacing: -0.012em;
+  line-height: 1.45;
+  letter-spacing: -0.004em;
 }
 .t-micro {
-  font-size: 12px;
-  line-height: 1.33;
+  font-size: 12.5px;
+  line-height: 1.35;
   letter-spacing: 0;
 }
 @media (max-width: 640px) {
   .t-display {
-    font-size: 32px;
+    font-size: 28px;
   }
   .t-lede {
     font-size: 19px;
@@ -136,16 +173,19 @@ html {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   height: 36px;
-  padding: 0 16px;
-  border-radius: 999px;
-  font-size: 15px;
-  font-weight: 560;
-  letter-spacing: -0.016em;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   transition:
     transform var(--t-fast) var(--ease-out),
     background-color var(--t-fast) var(--ease-out),
+    box-shadow var(--t-fast) var(--ease-out),
     opacity var(--t-fast) var(--ease-out);
   cursor: pointer;
   user-select: none;
@@ -160,28 +200,91 @@ html {
 .btn-primary {
   background: var(--accent);
   color: var(--accent-ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 2px rgba(74, 43, 232, 0.3);
 }
 .btn-primary:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--accent) 88%, var(--ink));
+  background: color-mix(in oklab, var(--accent) 90%, var(--ink));
 }
 .btn-quiet {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+.btn-quiet:hover:not(:disabled) {
+  background: var(--raised);
+}
+.btn-ghost {
+  color: var(--ink-2);
+}
+.btn-ghost:hover:not(:disabled) {
   background: var(--sunken);
   color: var(--ink);
 }
-.btn-quiet:hover:not(:disabled) {
-  background: color-mix(in oklab, var(--sunken) 85%, var(--ink));
+.btn-sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  padding: 9px 12px;
+  font-size: 15px;
+  outline: none;
+  transition: box-shadow var(--t-fast) var(--ease-out);
+}
+.field::placeholder {
+  color: var(--ink-3);
+}
+.field:focus {
+  box-shadow: 0 0 0 1px var(--accent), 0 0 0 4px var(--accent-soft);
+}
+
+.card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-1);
 }
 
 /* Popovers grow out of their trigger, enter on ease-out and leave faster than they came. */
 .pop {
-  transform-origin: var(--origin, top left);
   transition:
     opacity var(--t-fast) var(--ease-out),
     transform var(--t-fast) var(--ease-out);
   @starting-style {
     opacity: 0;
-    transform: scale(0.96) translateY(-2px);
+    transform: scale(0.97) translateY(-3px);
   }
+}
+
+dialog.sheet {
+  transition:
+    opacity var(--t-base) var(--ease-out),
+    transform var(--t-base) var(--ease-out),
+    overlay var(--t-base) allow-discrete,
+    display var(--t-base) allow-discrete;
+  opacity: 0;
+  transform: translateY(8px) scale(0.985);
+}
+dialog.sheet[open] {
+  opacity: 1;
+  transform: none;
+  @starting-style {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+dialog.sheet::backdrop {
+  background: rgba(13, 14, 17, 0.32);
+  backdrop-filter: blur(2px);
+  transition: opacity var(--t-base) var(--ease-out);
+}
+
 }
 
 /* Expanding rows animate height with grid rows, so content is never measured in JS. */
@@ -197,7 +300,6 @@ html {
   overflow: hidden;
 }
 
-/* Live stage indicator: a ring that turns, used only while research is actually running. */
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -214,7 +316,17 @@ html {
 }
 .fill-in {
   /* backwards, not both: a transform left on after the animation would trap fixed-position children */
-  animation: fill-in 320ms var(--ease-out) backwards;
+  animation: fill-in 260ms var(--ease-out) backwards;
+}
+/* The signal bars rise once, staggered, when a report first opens: the one orchestrated moment. */
+@keyframes rise {
+  from {
+    transform: scaleY(0.08);
+  }
+}
+.rise {
+  transform-origin: bottom;
+  animation: rise 520ms var(--ease-out) backwards;
 }
 .meter {
   transition: width 600ms var(--ease-out);

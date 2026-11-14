@@ -1,10 +1,12 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { FatalError } from 'workflow'
-import { assembleReport, assembleTriage, draftReport, gateOutcome, message, settle, statusOf, type GateResult, type StageResult, type Totals } from '../pipeline/run'
+import { assembleReport, assembleTriage, draftReport, gateOutcome, message, settle, statusOf, type DeepStages, type GateResult, type StageResult, type Totals } from '../pipeline/run'
 import { parse, type ParseOut } from '../pipeline/stage0-parse'
 import { resolve, type ResolveOut } from '../pipeline/stage1-resolve'
+import { business, type BusinessOut } from '../pipeline/stage2-business'
 import { money, type MoneyOut } from '../pipeline/stage3-money'
 import { people, type PeopleOut } from '../pipeline/stage4-people'
+import { market, type MarketOut } from '../pipeline/stage5-market'
 import { synthesize, type Draft, type SynthOut } from '../pipeline/stage8-synthesize'
 import { triage, type TriageOut } from '../pipeline/stage-triage'
 import { getDb } from '../db/db'
@@ -66,10 +68,17 @@ export async function resolveStep(c: Ctx, parsed: ParseOut): Promise<GateResult>
   return g
 }
 
-const STAGES = { money, people, triage } as const
+const STAGES = { business, money, people, market, triage } as const
+interface StageOut {
+  business: BusinessOut
+  money: MoneyOut
+  people: PeopleOut
+  market: MarketOut
+  triage: TriageOut
+}
 
 /** One research stage. Settles every failure except transient ones, which it rethrows for the workflow to retry. */
-export async function researchStep<K extends keyof typeof STAGES>(c: Ctx, name: K, identity: Identity): Promise<StageResult<K extends 'money' ? MoneyOut : K extends 'people' ? PeopleOut : TriageOut>> {
+export async function researchStep<K extends keyof typeof STAGES>(c: Ctx, name: K, identity: Identity): Promise<StageResult<StageOut[K]>> {
   "use step"
   await emit(c, name, 'started')
   const budget = await runBudget(c.mode, c.runId)
@@ -87,9 +96,9 @@ export async function researchStep<K extends keyof typeof STAGES>(c: Ctx, name: 
   return r as never
 }
 
-export async function synthStep(c: Ctx, parsed: ParseOut, gate: Extract<GateResult, { kind: 'pass' }>, m: StageResult<MoneyOut>, p: StageResult<PeopleOut>): Promise<{ draft: Draft; synth: StageResult<SynthOut> }> {
+export async function synthStep(c: Ctx, parsed: ParseOut, gate: Extract<GateResult, { kind: 'pass' }>, stages: DeepStages): Promise<{ draft: Draft; synth: StageResult<SynthOut> }> {
   "use step"
-  const draft = draftReport({ parsed, identity: gate.identity, resolveGaps: gate.gaps, money: m, people: p, totals: await totals(c) })
+  const draft = draftReport({ parsed, identity: gate.identity, resolveGaps: gate.gaps, ...stages, totals: await totals(c) })
   await emit(c, 'synthesize', 'started')
   const budget = await runBudget(c.mode, c.runId)
   const profile = await profileFor(c.owner)

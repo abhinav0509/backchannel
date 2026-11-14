@@ -48,6 +48,10 @@ function finding(e: RunEvent | undefined): string | null {
       const n = out.layoff_events?.length ?? 0
       return `${n === 0 ? 'No layoffs found' : `${n} layoff ${n === 1 ? 'event' : 'events'}`}, ${out.review_scores?.length ?? 0} review scores`
     }
+    case 'business':
+      return out.summary?.value ?? (out.founders?.length ? `${out.founders.length} founders found` : 'What they do not established')
+    case 'market':
+      return out.ai_summary?.value ?? `${out.recent_news?.length ?? 0} news items, ${out.ai_initiatives?.length ?? 0} AI initiatives`
     case 'triage':
       return out.deep_dive?.reason ?? null
     default:
@@ -70,7 +74,7 @@ export function Progress({ o }: { o: Opportunity }) {
   const stages = stagesFor(run?.mode ?? 'triage')
 
   return (
-    <section aria-live="polite" className="mb-12 rounded-[22px] border border-line-soft bg-surface p-6">
+    <section aria-live="polite" className="card mb-10 p-6">
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">{run?.mode === 'deep' ? 'Researching in depth' : 'Running a quick check'}</h2>
         <span className="t-small tabular-nums text-ink-3">{secs !== null && `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`}</span>
