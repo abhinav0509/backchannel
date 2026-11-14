@@ -74,6 +74,7 @@ export async function researchStage<S extends z.ZodType>(o: {
     prompt: extractionPrompt({ task: o.task, notes: research.notes, sources: research.sources, retrievedAt: research.at }),
     schema: o.schema,
     retrievedUrls: research.retrievedUrls,
+    thinking: false, // mechanical conversion: thinking once spent the whole output budget
     ...(o.constrained === false && { constrained: false }),
   })
   return { data, dropped, searchCapped: research.searchCapped }

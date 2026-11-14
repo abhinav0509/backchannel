@@ -119,6 +119,16 @@ it('synthesis reads the business and market research, and labels the outlook as 
   expect(synthTask).toMatch(/why/i)
 })
 
+it('business and market cap their lists, so extraction fits in one answer', async () => {
+  const { businessTask } = await import('./stage2-business')
+  const { marketTask } = await import('./stage5-market')
+  for (const task of [businessTask, marketTask]) {
+    expect(task).toMatch(/at most \d+/)
+    expect(task).toMatch(/one evidence entry/)
+  }
+  expect(businessTask).toMatch(/company name alone/)
+})
+
 it('triage asks for a recommendation addressed to the candidate', async () => {
   const { triageTask } = await import('./stage-triage')
   expect(triageTask).toMatch(/addressed to the candidate/i)

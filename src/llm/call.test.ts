@@ -28,6 +28,29 @@ describe('callStructured', () => {
     expect(retryMessages[2].content).toMatch(/year/)
   })
 
+  it('when the answer was cut off at the length limit, starts over asking for less instead of repeating it', async () => {
+    send.mockResolvedValueOnce({ ...text('{"year":20'), truncated: true }).mockResolvedValueOnce(text('{"year":2020}'))
+    await expect(callStructured(opts())).resolves.toMatchObject({ data: { year: 2020 } })
+    const retry = send.mock.calls[1]?.[0].messages
+    expect(retry).toHaveLength(1)
+    expect(retry[0].content).toMatch(/^p/)
+    expect(retry[0].content).toMatch(/cut off/i)
+  })
+
+  it('makes each cut-off retry a distinct request, so the cache cannot serve the cut-off answer again', async () => {
+    send.mockResolvedValueOnce({ ...text('{"year":'), truncated: true }).mockResolvedValueOnce({ ...text('{"year":'), truncated: true }).mockResolvedValueOnce(text('{"year":2020}'))
+    await callStructured(opts())
+    expect(send.mock.calls[1]?.[0].messages[0].content).not.toEqual(send.mock.calls[2]?.[0].messages[0].content)
+  })
+
+  it('turns thinking off when asked, and leaves the model default otherwise', async () => {
+    send.mockResolvedValue(text('{"year":2020}'))
+    await callStructured({ ...opts(), thinking: false })
+    expect(send.mock.calls[0]?.[0].thinking).toEqual({ type: 'disabled' })
+    await callStructured(opts())
+    expect(send.mock.calls[1]?.[0]).not.toHaveProperty('thinking')
+  })
+
   it('gives up after two retries instead of retrying forever', async () => {
     send.mockResolvedValue(text('{"year":12}'))
     await expect(callStructured(opts())).rejects.toBeInstanceOf(ValidationFailed)

@@ -78,7 +78,7 @@ function Item({ q, entry, onChange }: { q: Question; entry: PrepEntry | undefine
  * Interview prep from what research found and could not find. Tick a question off as you ask
  * it and note the answer; answers are kept by question, so a re-run keeps the ones it repeats.
  */
-export function Prep({ id, questions, gaps, initial }: { id: string; questions: Question[]; gaps: string[]; initial: Record<string, PrepEntry> }) {
+export function Prep({ id, questions, gaps, initial, onChange }: { id: string; questions: Question[]; gaps: string[]; initial: Record<string, PrepEntry>; onChange?: (prep: Record<string, PrepEntry>) => void }) {
   const [prep, setPrep] = useState(initial)
   const { state, save } = useAutosave(id)
   const [copied, setCopied] = useState(false)
@@ -88,6 +88,7 @@ export function Prep({ id, questions, gaps, initial }: { id: string; questions: 
     // Keep only entries for questions on screen, so stale answers never crowd out new ones.
     const next = Object.fromEntries(Object.entries({ ...prep, [q]: e }).filter(([k, v]) => questions.some((x) => x.question === k) && (v.asked || v.answer)))
     setPrep(next)
+    onChange?.(next)
     save({ prep: next }, e.asked !== prep[q]?.asked ? 0 : 700)
   }
 

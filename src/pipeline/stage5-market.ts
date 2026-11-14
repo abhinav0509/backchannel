@@ -22,7 +22,7 @@ Establish:
 
 ${researchRules(MAX_SEARCHES)}`
 
-export const marketTask = `ai_stance: one of ${AiStance.options.join(', ')}, or null if sources do not show it. ai_summary, strategy: a sentence or two each, or null. ai_initiatives: one claim per product, feature, partnership or investment. recent_news: one claim per event, with its date and a plain headline. tailwinds, headwinds: one claim each, a short sentence.`
+export const marketTask = `ai_stance: one of ${AiStance.options.join(', ')}, or null if sources do not show it. ai_summary, strategy: a sentence or two each, or null. ai_initiatives: one claim per product, feature, partnership or investment, at most 6, the most significant. recent_news: one claim per event, with its date and a plain headline, at most 8, the most significant. tailwinds, headwinds: one claim each, a short sentence, at most 4 of each. Give each claim one evidence entry: the source that states it most directly.`
 
 // constrained: false, like money and people: claim-heavy schemas exceed the structured-output grammar limit.
 export async function market(c: { display_name: string; domain: string }, budget: Budget) {

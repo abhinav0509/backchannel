@@ -22,6 +22,8 @@ describe('researchStage', () => {
     expect(callResearch.mock.calls[0]?.[0]).toMatchObject({ stage: 'money', model: 'claude-sonnet-5-5', maxSearches: 8, system: 'sys', prompt: 'p' })
     const extract = callStructured.mock.calls[0]?.[0]
     expect(extract).toMatchObject({ stage: 'money', model: 'claude-haiku-5-5', schema, retrievedUrls: ['https://a.example', 'https://b.example'] })
+    // Conversion is mechanical; thinking once spent the whole output budget and cut the JSON off.
+    expect(extract.thinking).toBe(false)
     expect(extract.prompt).toContain('do it')
     expect(extract.prompt).toContain('retrieved_at is 2026-11-01T00:00:00.000Z')
     expect(r).toEqual({ data: { ok: 1 }, dropped: ['d'], searchCapped: true })

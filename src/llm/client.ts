@@ -11,6 +11,7 @@ export interface Sent {
   searchCapped: boolean
   at: string // when the API produced this content; preserved on cache hits
   cached: boolean
+  truncated?: boolean // the answer hit max_tokens: it is cut off, so a retry must ask for less
 }
 
 let client: Anthropic | undefined
@@ -51,6 +52,7 @@ export async function send(
   const at = new Date().toISOString()
   let searches = 0
   let searchCapped = false
+  let truncated = false
 
   for (;;) {
     ctx.budget.assertCanSpend()
@@ -75,6 +77,7 @@ export async function send(
     log('llm_call', { stage: ctx.stage, model: res.model, stop: res.stop_reason, ms: Date.now() - started, ...usage, usd })
 
     if (res.stop_reason === 'refusal') throw new RefusalError(`${ctx.stage}: model refused (${res.stop_details?.category ?? 'no category'})`)
+    truncated = res.stop_reason === 'max_tokens'
     if (res.stop_reason !== 'pause_turn') break
     // A paused server-tool turn resumes by resending it unchanged. Stop instead once the stage's searches are spent.
     if (ctx.maxSearches !== undefined && (searches >= ctx.maxSearches || ctx.budget.remainingSearches === 0)) {
@@ -84,7 +87,7 @@ export async function send(
     messages.push({ role: 'assistant', content: res.content })
   }
 
-  const sent = { content, searchCapped, at }
+  const sent = { content, searchCapped, at, ...(truncated && { truncated }) }
   await cacheSet(key, sent)
   return { ...sent, cached: false }
 }

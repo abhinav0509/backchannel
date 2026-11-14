@@ -170,7 +170,7 @@ function Card({ o, today }: { o: Summary; today: string }) {
         <ResearchLine o={o} />
       </div>
       <div className="relative z-10 mt-3 flex items-center justify-between gap-2">
-        <StagePicker id={o.id} stage={o.pipeline} reason={o.pipeline_reason} size="sm" />
+        <StagePicker id={o.id} stage={o.pipeline} reason={o.pipeline_reason} size="sm" align="start" />
         <NextStep o={o} today={today} compact />
       </div>
     </li>

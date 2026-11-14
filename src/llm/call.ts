@@ -32,20 +32,24 @@ export async function callStructured<S extends z.ZodType>(o: {
   // false for schemas too large for the API's structured-output grammar: the JSON Schema goes in
   // the prompt instead, and the zod check plus retries still enforce it.
   constrained?: boolean
+  // false for mechanical conversions: thinking tokens count against max_tokens, and on large
+  // extractions they used it all up and cut the JSON off. Only on models that accept it (Haiku 5.5).
+  thinking?: false
 }): Promise<{ data: z.output<S>; dropped: string[] }> {
   const constrained = o.constrained ?? true
   const prompt = constrained
     ? o.prompt
     : `${o.prompt}\n\nReturn only JSON matching this JSON Schema, with no prose:\n${JSON.stringify(z.toJSONSchema(o.schema, { io: 'input' }))}`
-  const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: prompt }]
+  let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: prompt }]
   let issues = ''
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const { content } = await send(
+    const { content, truncated } = await send(
       {
         model: o.model,
         max_tokens: 16000,
         system: o.system,
         messages,
+        ...(o.thinking === false && { thinking: { type: 'disabled' as const } }),
         ...((constrained || o.effort) && {
           output_config: { ...(constrained && { format: zodOutputFormat(o.schema) }), ...(o.effort && { effort: o.effort }) },
         }),
@@ -55,13 +59,26 @@ export async function callStructured<S extends z.ZodType>(o: {
     const result = validateSourced(textOf(content), o.schema, o.retrievedUrls)
     if (result.ok) return { data: result.data, dropped: result.dropped }
     issues = result.issues
-    messages.push(
+    if (truncated) {
+      // A cut-off answer cannot be corrected, only shortened: start over and ask for less.
+      issues = `the answer was cut off at the length limit (${issues})`
+      messages = [
+        {
+          role: 'user',
+          // The attempt number keeps each retry distinct: an identical request would be served the cut-off answer from cache.
+          content: `${prompt}\n\nA previous answer (attempt ${attempt + 1}) was too long and was cut off. Keep only the most important items in each list, and give each claim one evidence entry.`,
+        },
+      ]
+      continue
+    }
+    messages = [
+      ...messages,
       { role: 'assistant', content },
       {
         role: 'user',
         content: `That output failed validation:\n${issues}\n\nReturn corrected JSON only. Never invent a source: leave out any claim you cannot cite and say so in gaps.`,
       },
-    )
+    ]
   }
   throw new ValidationFailed(`${o.stage}: still invalid after ${MAX_RETRIES} retries\n${issues}`)
 }

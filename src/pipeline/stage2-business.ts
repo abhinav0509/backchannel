@@ -22,7 +22,7 @@ Establish:
 
 ${researchRules(MAX_SEARCHES)}`
 
-export const businessTask = `summary, customers, business_model: a sentence or two each, or null. products: one claim per product, name and one-line description. competitors: one claim per named competitor. founders and leaders: one claim per person; background and since only where sourced, else null; still_involved null unless a source says.`
+export const businessTask = `summary, customers, business_model: a sentence or two each, or null. products: one claim per product, name and one-line description, at most 8 (the main ones). competitors: one claim per named competitor, at most 6; the value is the company name alone, with nothing else in it. founders: one claim per person. leaders: one claim per person, at most 10, executives first. background and since only where sourced, else null; still_involved null unless a source says. Give each claim one evidence entry: the source that states it most directly.`
 
 // constrained: false, like money and people: claim-heavy schemas exceed the structured-output grammar limit.
 export async function business(c: { display_name: string; domain: string }, budget: Budget) {

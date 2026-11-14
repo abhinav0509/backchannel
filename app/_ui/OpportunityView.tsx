@@ -282,6 +282,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
                   questions={r.questions.length ? r.questions : r.questions_to_ask.map((q) => ({ question: q, why: '', topic: 'company' as const }))}
                   gaps={r.gaps}
                   initial={o.prep}
+                  onChange={(prep) => setO((x) => ({ ...x, prep }))}
                 />
               )}
               {tab === 'sources' && <RunView o={o} />}

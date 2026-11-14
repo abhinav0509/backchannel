@@ -27,12 +27,14 @@ export function StagePicker({
   reason,
   onChange,
   size = 'md',
+  align = 'end',
 }: {
   id: string
   stage: Pipeline
   reason: PipelineReason | null
   onChange?: (stage: Pipeline, reason: PipelineReason | null) => void
   size?: 'sm' | 'md'
+  align?: 'start' | 'end'
 }) {
   const router = useRouter()
   const [current, setCurrent] = useState({ stage, reason })
@@ -66,6 +68,7 @@ export function StagePicker({
     <Popover
       label={`Stage: ${s.label}. Change stage`}
       width={300}
+      align={align}
       trigger={(open) => (
         <span
           className={`inline-flex items-center gap-2 rounded-full bg-surface font-semibold shadow-[var(--shadow-1)] transition-[background-color,box-shadow] duration-150 hover:bg-raised ${open ? 'ring-2 ring-accent/30' : ''} ${
