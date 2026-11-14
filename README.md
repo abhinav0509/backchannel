@@ -1,9 +1,10 @@
 # Backchannel
 
 Sourced due diligence on the companies that approach you. Paste a recruiter email or name a
-company; get what it does, its founders and leaders, ownership and money, layoffs and employee
-sentiment, where it stands on AI and where it is heading, every fact linked to the source behind
-it. Then six scores, risks, and interview questions you can tick off as you ask them.
+company; get what it does, its founders and leaders, the people tied to the role (likely hiring
+manager and the leadership above it, with LinkedIn links from search results), ownership and money,
+layoffs and employee sentiment, where it stands on AI and where it is heading, every fact linked to
+the source behind it. Then six scores, risks, and interview questions you can tick off as you ask them.
 
 Track each one through your search: New, Interested, Screening, Interviewing, Offer, Back pocket,
 On hold, Passed or Closed (with the reason), with a next step, a date and notes.
@@ -50,8 +51,8 @@ The app refuses to run on Vercel without these variables, rather than run unprot
 ## How it is built
 
 - **Research pipeline** (`src/pipeline`): parse, identify the company (stops to ask when unsure),
-  then four stages in parallel (what they do and who runs it; ownership and money; people and
-  leadership; AI and outlook), then a synthesis with scores, flags, an outlook read and questions.
+  then five stages in parallel (what they do and who runs it; ownership and money; people and
+  leadership; AI and outlook; people to know for the role), then a synthesis with scores, flags, an outlook read and questions.
   Every claim must cite a source the web search actually returned, or it is dropped and listed as a gap.
 - **Durable runs** (`src/workflows`): each stage is a separate, retried Vercel Workflow step, so a
   four-minute run survives the 300-second function limit, timeouts and redeploys.
@@ -61,7 +62,7 @@ The app refuses to run on Vercel without these variables, rather than run unprot
 
 ## What a run costs
 
-A quick check is about $0.30 and a minute. Full research is about $1.70 and four to six minutes.
+A quick check is about $0.30 and a minute. Full research is about $1.90 and four to six minutes.
 Repeat requests are served from the cache for free. Spend is capped at $20 a month
 (`src/config.ts`); new research stops at the cap.
 

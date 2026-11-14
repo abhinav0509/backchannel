@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react'
 import { roleTitle } from '../../../src/report/markdown'
-import type { AiStance, CompanyResearch } from '../../../src/types/research'
+import type { AiStance, CompanyResearch, ContactRelation } from '../../../src/types/research'
 import { ownershipLabel } from '../../_lib/format'
+import { linkedinSearch, profileUrl, roleSearches } from '../../_lib/linkedin'
 import { Cites, Confidence } from '../Evidence'
 import { Monogram } from '../Monogram'
 import { Claims, Fact, Facts, n, NotYet, Section, Timeline, urls, type C } from './kit'
@@ -113,7 +114,31 @@ export function CompanyTab({ r, ...deep }: { r: R } & Deep) {
   )
 }
 
-function PersonCard({ p, c, badge }: { p: { name: string; role: string; background: string | null; since: string | null }; c: C<unknown>; badge?: ReactNode }) {
+function External() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden>
+      <path d="M4 2H2.5A.5.5 0 0 0 2 2.5v5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 .5-.5V6M6 2h2v2M8 2 4.5 5.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** A profile link when search returned one for this person; otherwise a LinkedIn search you run yourself. */
+function ProfileLink({ name, company, evidence }: { name: string; company: string; evidence: { url: string }[] }) {
+  const url = profileUrl(evidence)
+  return (
+    <a
+      href={url ?? linkedinSearch(`${name} ${company}`)}
+      target="_blank"
+      rel="noreferrer"
+      className="relative z-10 mt-2 inline-flex items-center gap-1.5 t-micro font-semibold text-accent hover:underline"
+    >
+      {url ? 'LinkedIn profile' : 'Find on LinkedIn'}
+      <External />
+    </a>
+  )
+}
+
+function PersonCard({ p, c, company, badge }: { p: { name: string; role: string; background: string | null; since: string | null }; c: C<unknown>; company: string; badge?: ReactNode }) {
   return (
     <li className="card flex gap-3.5 p-4">
       <Monogram name={p.name} size={40} />
@@ -127,9 +152,88 @@ function PersonCard({ p, c, badge }: { p: { name: string; role: string; backgrou
           {p.since && <span className="text-ink-3"> since {p.since}</span>}
         </p>
         {p.background && <p className="mt-1.5 t-small text-ink-3">{p.background}</p>}
-        {badge}
+        <div className="flex flex-wrap items-center gap-x-3">
+          {badge}
+          <ProfileLink name={p.name} company={company} evidence={c.evidence} />
+        </div>
       </div>
     </li>
+  )
+}
+
+const RELATION: Record<ContactRelation, string> = {
+  hiring_manager: 'Likely hiring manager',
+  leadership_above_role: 'Leadership above the role',
+  recruiter: 'Recruiter',
+  team: 'On the team',
+}
+
+/** The few people tied to this role, and LinkedIn searches to find the rest yourself. */
+function PeopleToKnow({ r, ...deep }: { r: R } & Deep) {
+  const company = r.identity.display_name
+  const searches = roleSearches(company, r.role)
+  return (
+    <Section title="People to know for this role" aside="From public search results" id="contacts">
+      {r.contacts === null ? (
+        <p className="t-small text-ink-3">
+          Not researched for this report.{' '}
+          {deep.onDeep && !deep.running && (
+            <button className="font-semibold text-accent hover:underline" onClick={deep.onDeep}>
+              Run full research again
+            </button>
+          )}{' '}
+          to look for the likely hiring manager and the leadership above the role.
+        </p>
+      ) : r.contacts.length === 0 ? (
+        <p className="t-small text-ink-3">Nobody tied to this role turned up in public sources. The searches below are the next best thing.</p>
+      ) : (
+        <ul className="grid gap-2 sm:grid-cols-2">
+          {r.contacts.map((c, i) => (
+            <li key={i} className="card flex gap-3.5 p-4">
+              <Monogram name={c.value.name} size={40} />
+              <div className="min-w-0">
+                <p className="t-micro font-medium text-ink-3">{RELATION[c.value.relation]}</p>
+                <p className="font-semibold">
+                  {c.value.name}
+                  <Cites urls={urls(c)} />
+                </p>
+                {c.value.title && <p className="t-small text-ink-2">{c.value.title}</p>}
+                <p className="mt-1.5 t-small text-ink-3">{c.value.why}</p>
+                <div className="flex flex-wrap items-center gap-x-3">
+                  <span
+                    className={`mt-2 inline-block rounded-full px-2 py-0.5 t-micro font-medium ${c.value.match === 'confirmed' ? 'bg-green-soft text-green' : 'bg-amber-soft text-amber'}`}
+                    title={c.value.match === 'confirmed' ? 'A source names this person with this company and title' : 'The link to this company or role is weaker: check before reaching out'}
+                  >
+                    {c.value.match === 'confirmed' ? 'Confirmed match' : 'Possible match'}
+                  </span>
+                  <ProfileLink name={c.value.name} company={company} evidence={c.evidence} />
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-5">
+        <p className="t-small font-medium">Search LinkedIn yourself</p>
+        <p className="t-micro text-ink-3">Opens in your own LinkedIn, with mutual connections and who to message.</p>
+        <ul className="mt-2.5 flex flex-wrap gap-2">
+          {searches.map((q) => (
+            <li key={q.keywords}>
+              <a
+                href={linkedinSearch(q.keywords)}
+                target="_blank"
+                rel="noreferrer"
+                title={q.keywords}
+                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-surface px-3 t-small font-medium shadow-[var(--shadow-1)] transition-colors duration-100 hover:text-accent"
+              >
+                {q.label}
+                <External />
+              </a>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </Section>
   )
 }
 
@@ -137,8 +241,10 @@ function PersonCard({ p, c, badge }: { p: { name: string; role: string; backgrou
 export function PeopleTab({ r, ...deep }: { r: R } & Deep) {
   const b = r.business
   const p = r.people
+  const company = r.identity.display_name
   return (
     <div className="space-y-12">
+      <PeopleToKnow r={r} {...deep} />
       {b ? (
         <>
           <Section title="Founders" id="founders">
@@ -149,6 +255,7 @@ export function PeopleTab({ r, ...deep }: { r: R } & Deep) {
                     key={i}
                     p={c.value}
                     c={c}
+                    company={company}
                     badge={
                       c.value.still_involved !== null && (
                         <span className={`mt-2 inline-block rounded-full px-2 py-0.5 t-micro font-medium ${c.value.still_involved ? 'bg-green-soft text-green' : 'bg-sunken text-ink-3'}`}>
@@ -167,7 +274,7 @@ export function PeopleTab({ r, ...deep }: { r: R } & Deep) {
             {b.leaders.length ? (
               <ul className="grid gap-2 sm:grid-cols-2">
                 {b.leaders.map((c, i) => (
-                  <PersonCard key={i} p={c.value} c={c} />
+                  <PersonCard key={i} p={c.value} c={c} company={company} />
                 ))}
               </ul>
             ) : (

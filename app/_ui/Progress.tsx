@@ -52,6 +52,10 @@ function finding(e: RunEvent | undefined): string | null {
       return out.summary?.value ?? (out.founders?.length ? `${out.founders.length} founders found` : 'What they do not established')
     case 'market':
       return out.ai_summary?.value ?? `${out.recent_news?.length ?? 0} news items, ${out.ai_initiatives?.length ?? 0} AI initiatives`
+    case 'contacts': {
+      const n = out.contacts?.length ?? 0
+      return n ? `${n} ${n === 1 ? 'person' : 'people'} found` : 'Nobody tied to the role found'
+    }
     case 'triage':
       return out.deep_dive?.reason ?? null
     default:

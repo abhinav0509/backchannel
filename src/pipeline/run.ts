@@ -7,6 +7,7 @@ import { business, type BusinessOut } from './stage2-business'
 import { money, type MoneyOut } from './stage3-money'
 import { people, type PeopleOut } from './stage4-people'
 import { market, type MarketOut } from './stage5-market'
+import { contacts, type ContactsOut } from './stage6-contacts'
 import { synthesize, type Draft, type SynthOut } from './stage8-synthesize'
 import { triage, type TriageOut } from './stage-triage'
 
@@ -82,16 +83,17 @@ const strip = <T extends { gaps: string[] }>({ gaps: _g, ...rest }: T) => rest
 type Identity = NonNullable<ResolveOut['identity']>
 
 /** The research so far, as stage 8 sees it. */
-/** The four deep research stages, which run in parallel. */
+/** The deep research stages, which run in parallel. */
 export interface DeepStages {
   business: StageResult<BusinessOut>
   money: StageResult<MoneyOut>
   people: StageResult<PeopleOut>
   market: StageResult<MarketOut>
+  contacts: StageResult<ContactsOut>
 }
 
 export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; totals: Totals } & DeepStages): Draft {
-  const status = { parse: 'ok', resolve: 'ok', business: statusOf(p.business), money: statusOf(p.money), people: statusOf(p.people), market: statusOf(p.market) } as const
+  const status = { parse: 'ok', resolve: 'ok', business: statusOf(p.business), money: statusOf(p.money), people: statusOf(p.people), market: statusOf(p.market), contacts: statusOf(p.contacts) } as const
   return {
     schema_version: 2,
     generated_at: new Date().toISOString(),
@@ -101,6 +103,7 @@ export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGa
     money: p.money.data ? strip(p.money.data) : EMPTY_MONEY,
     people: p.people.data ? strip(p.people.data) : EMPTY_PEOPLE,
     market: p.market.data ? strip(p.market.data) : null,
+    contacts: p.contacts.data?.contacts ?? null,
     role: p.parsed.role,
     gaps: unique([
       ...p.resolveGaps,
@@ -108,6 +111,7 @@ export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGa
       ...stageGaps('money', p.money),
       ...stageGaps('people', p.people),
       ...stageGaps('market', p.market),
+      ...stageGaps('contacts', p.contacts),
     ]),
     run: runField('deep', p.totals, status),
   }
@@ -145,6 +149,13 @@ export function assembleTriage(p: { parsed: ParseOut; identity: Identity; resolv
     run: runField('triage', p.totals, stage_status),
   }
 }
+
+/** What the contacts stage needs beyond the company: the role, and the recruiter's name (never their email). */
+export const contactsInput = (identity: Identity, parsed: ParseOut) => ({
+  ...identity,
+  role: parsed.role,
+  recruiter: parsed.recruiter.name ? { name: parsed.recruiter.name, agency: parsed.recruiter.agency } : null,
+})
 
 /** Runs a stage and turns any failure into a result, so one stage failing degrades the report instead of killing it. */
 export async function settle<T>(fn: () => Promise<{ data: T; dropped: string[]; searchCapped?: boolean }>): Promise<StageResult<T>> {
@@ -206,13 +217,14 @@ export async function runResearch(input: {
     return { kind: 'triage', result: assembleTriage({ parsed, identity: g.identity, resolveGaps: g.gaps, triage: t, totals: totals() }), budget }
   }
 
-  const [b, m, p, k] = await Promise.all([
+  const [b, m, p, k, c] = await Promise.all([
     stage('business', () => business(g.identity, budget)),
     stage('money', () => money(g.identity, budget)),
     stage('people', () => people(g.identity, budget)),
     stage('market', () => market(g.identity, budget)),
+    stage('contacts', () => contacts(contactsInput(g.identity, parsed), budget)),
   ])
-  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, business: b, money: m, people: p, market: k, totals: totals() })
+  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, business: b, money: m, people: p, market: k, contacts: c, totals: totals() })
   const s = await stage('synthesize', () => synthesize({ draft, profile: input.profile }, budget))
   return { kind: 'report', report: assembleReport(draft, s, totals()), budget }
 }

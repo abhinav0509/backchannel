@@ -32,6 +32,7 @@ const report = (): CompanyResearch => ({
     ai_stance: c('ai_adopting', [B]), ai_summary: null, ai_initiatives: [], strategy: null,
     recent_news: [c({ date: '2026-09', headline: 'Placeholder launch' }, [B])], tailwinds: [], headwinds: [],
   },
+  contacts: [c({ name: 'Person Placeholder', title: 'Design Manager', relation: 'hiring_manager', match: 'possible', why: 'Likely leads the team.' }, ['https://www.linkedin.com/in/placeholder'])],
   questions_to_ask: ['How did the 2023 cuts affect design?'],
   questions: [{ question: 'How did the 2023 cuts affect design?', why: 'A 10% cut in 2023.', topic: 'team' }],
   verdict: 'Main risk is layoffs.',
@@ -55,8 +56,15 @@ describe('toMarkdown', () => {
     expect(md).toMatch(/How did the 2023 cuts affect design\?\n\s+Why: A 10% cut in 2023\./)
   })
 
+  it('lists people to know with how sure the match is and their profile link', () => {
+    expect(md).toContain('## People to know')
+    expect(md).toMatch(/Person Placeholder, Design Manager, likely hiring manager, possible match/)
+    expect(md).toContain('https://www.linkedin.com/in/placeholder')
+  })
+
   it('leaves the new sections out of reports made before they existed', () => {
-    const old = toMarkdown({ ...report(), business: null, market: null, questions: [], outlook: null })
+    const old = toMarkdown({ ...report(), business: null, market: null, contacts: null, questions: [], outlook: null })
+    expect(old).not.toContain('## People to know')
     expect(old).not.toContain('## What they do')
     expect(old).toContain('1. How did the 2023 cuts affect design?')
   })
@@ -71,7 +79,7 @@ describe('toMarkdown', () => {
     expect(md).toContain('Nowhere (reported) [1]')
     expect(md).toContain('1. [T](https://a.example/1)')
     expect(md).toContain('2. [T](https://b.example/2)')
-    expect(md.match(/^\d+\. \[T\]/gm)).toHaveLength(2)
+    expect(md.match(/^\d+\. \[T\]/gm)).toHaveLength(3) // two report sources and one profile link
   })
 
   it('shows unknown scores as unknown, never as a number', () => {

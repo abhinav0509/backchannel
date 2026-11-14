@@ -108,7 +108,7 @@ export const Score = z.object({
 })
 
 export const StageName = z.enum([
-  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'local', 'role', 'synthesize',
+  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'contacts', 'local', 'role', 'synthesize',
 ])
 
 export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
@@ -167,6 +167,23 @@ export const Market = z.object({
   headwinds: z.array(claim(z.string())),
 })
 
+/** How someone relates to the role you are considering. */
+export const ContactRelation = z.enum(['hiring_manager', 'leadership_above_role', 'recruiter', 'team'])
+
+/**
+ * Someone worth knowing for this role, from public search results only. Work information only.
+ * Their profile link, when there is one, is a LinkedIn URL among the claim's evidence: a search
+ * result, never a page we opened.
+ */
+export const Contact = z.object({
+  name: z.string(),
+  title: z.string().nullable(),
+  relation: ContactRelation,
+  // confirmed: a source names this person with this company and a current title; possible: anything less.
+  match: z.enum(['confirmed', 'possible']),
+  why: z.string(), // why this person matters to the candidate
+})
+
 export const QuestionTopic = z.enum(['role', 'team', 'company', 'money', 'future', 'ai', 'culture', 'comp'])
 
 /** An interview question, why it is worth asking, and what it is about. */
@@ -215,6 +232,7 @@ export const CompanyResearch = z.object({
   // Reports from before these stages existed read back as null and [].
   business: Business.nullable().default(null),
   market: Market.nullable().default(null),
+  contacts: z.array(claim(Contact)).max(6).nullable().default(null),
 
   role: Role,
   flags: z.array(Flag),
@@ -253,6 +271,8 @@ export type EvidenceRef = z.infer<typeof EvidenceRef>
 export type Business = z.infer<typeof Business>
 export type Market = z.infer<typeof Market>
 export type Question = z.infer<typeof Question>
+export type Contact = z.infer<typeof Contact>
+export type ContactRelation = z.infer<typeof ContactRelation>
 export type QuestionTopic = z.infer<typeof QuestionTopic>
 export type AiStance = z.infer<typeof AiStance>
 export type FundingEvent = z.infer<typeof FundingEvent>

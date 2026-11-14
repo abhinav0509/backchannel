@@ -45,6 +45,22 @@ export function toMarkdown(r: CompanyResearch): string {
   const questions = r.questions.length
     ? r.questions.map((q, i) => `${i + 1}. ${q.question}\n   Why: ${q.why}`).join('\n')
     : r.questions_to_ask.map((q, i) => `${i + 1}. ${q}`).join('\n') || 'None generated.'
+  const RELATION = { hiring_manager: 'likely hiring manager', leadership_above_role: 'leadership above the role', recruiter: 'recruiter', team: 'on the team' } as const
+  const contactsSection = r.contacts
+    ? `
+## People to know
+
+${
+  r.contacts
+    .map((c) => {
+      const p = c.value
+      const profile = c.evidence.find((e) => /linkedin\.com\/in\//.test(e.url))?.url
+      return `- ${[p.name, p.title, RELATION[p.relation], `${p.match} match`].filter(Boolean).join(', ')}${refs(c.evidence.map((e) => e.url))}\n  ${p.why}${profile ? `\n  Profile: ${profile}` : ''}`
+    })
+    .join('\n') || 'Nobody tied to this role could be found in public sources.'
+}
+`
+    : ''
   const businessSection = biz
     ? `
 ## What they do
@@ -131,7 +147,7 @@ ${flags('green')}
 ## Questions to ask
 
 ${questions}
-${businessSection}${marketSection}
+${businessSection}${contactsSection}${marketSection}
 ## Company
 
 - Legal name: ${claim(id.legal_name)}

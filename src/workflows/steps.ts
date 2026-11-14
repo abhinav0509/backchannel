@@ -7,6 +7,7 @@ import { business, type BusinessOut } from '../pipeline/stage2-business'
 import { money, type MoneyOut } from '../pipeline/stage3-money'
 import { people, type PeopleOut } from '../pipeline/stage4-people'
 import { market, type MarketOut } from '../pipeline/stage5-market'
+import { contacts, type ContactsInput, type ContactsOut } from '../pipeline/stage6-contacts'
 import { synthesize, type Draft, type SynthOut } from '../pipeline/stage8-synthesize'
 import { triage, type TriageOut } from '../pipeline/stage-triage'
 import { getDb } from '../db/db'
@@ -68,17 +69,18 @@ export async function resolveStep(c: Ctx, parsed: ParseOut): Promise<GateResult>
   return g
 }
 
-const STAGES = { business, money, people, market, triage } as const
+const STAGES = { business, money, people, market, contacts, triage } as const
 interface StageOut {
   business: BusinessOut
   money: MoneyOut
   people: PeopleOut
   market: MarketOut
+  contacts: ContactsOut
   triage: TriageOut
 }
 
 /** One research stage. Settles every failure except transient ones, which it rethrows for the workflow to retry. */
-export async function researchStep<K extends keyof typeof STAGES>(c: Ctx, name: K, identity: Identity): Promise<StageResult<StageOut[K]>> {
+export async function researchStep<K extends keyof typeof STAGES>(c: Ctx, name: K, identity: Identity & Partial<ContactsInput>): Promise<StageResult<StageOut[K]>> {
   "use step"
   await emit(c, name, 'started')
   const budget = await runBudget(c.mode, c.runId)

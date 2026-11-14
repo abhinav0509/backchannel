@@ -21,7 +21,7 @@ export function TriageView({ t, running, onDeep }: { t: TriageResult; running: b
         <section aria-label="Full research" className="card flex flex-wrap items-center justify-between gap-5 p-5">
           <div className="max-w-[46ch]">
             <p className="font-semibold">See the whole company</p>
-            <p className="mt-1 t-small text-ink-2">Founders and leaders, what they sell, money, layoffs, AI, where it is heading, six scores and questions to ask. 4 to 6 minutes, about $1.70.</p>
+            <p className="mt-1 t-small text-ink-2">Founders and leaders, what they sell, money, layoffs, AI, where it is heading, six scores and questions to ask. 4 to 6 minutes, about $1.90.</p>
           </div>
           <button className={`btn ${t.deep_dive.recommended ? 'btn-primary' : 'btn-quiet'}`} onClick={onDeep}>
             Run full research

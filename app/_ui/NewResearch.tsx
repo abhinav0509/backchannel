@@ -158,7 +158,7 @@ export function NewResearch({ variant = 'primary', label = 'New research', short
             >
               <span className="flex items-center justify-between">
                 <span className="font-semibold">{pending === 'deep' ? 'Starting…' : 'Full research'}</span>
-                <span className="t-micro text-ink-3">about $1.70</span>
+                <span className="t-micro text-ink-3">about $1.90</span>
               </span>
               <span className="mt-1 block t-small text-ink-2">Founders, money, people, AI, outlook, scores and interview prep. 4 to 6 minutes.</span>
             </button>

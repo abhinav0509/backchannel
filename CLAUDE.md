@@ -12,7 +12,7 @@ Work test-first: write the failing test, then the code.
 
 Your pipeline stage (`src/types/tracking.ts`: New to Closed, with a reason when passing or closing),
 notes, next step and prep answers are edited by hand and live on the opportunity row, apart from
-research. Deep runs: business, money, people and market stages in parallel, then synthesis.
+research. Deep runs: business, money, people, market and contacts stages in parallel, then synthesis.
 
 ## Principles that override convenience
 
@@ -25,6 +25,9 @@ research. Deep runs: business, money, people and market stages in parallel, then
 5. **Budgets are enforced, not suggested.** Hard caps on searches and tokens. Partial report over a
    runaway bill.
 6. **Do not scrape** Glassdoor, LinkedIn, AmbitionBox or Blind. Search and permitted fetches only.
+   People to know (`stage6-contacts`) uses LinkedIn profile URLs only as they come back in search
+   results, never opens them, and keeps to work information about people tied to the role. Every
+   other LinkedIn link in the app is a people search that opens in the user's own session.
 
 ## Conventions
 

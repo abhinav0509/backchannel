@@ -11,6 +11,7 @@ const { money, MoneyOut } = await import('./stage3-money')
 const { people, PeopleOut } = await import('./stage4-people')
 const { business, BusinessOut } = await import('./stage2-business')
 const { market, MarketOut } = await import('./stage5-market')
+const { contacts, ContactsOut, contactsPrompt } = await import('./stage6-contacts')
 const { synthesize, SynthOut } = await import('./stage8-synthesize')
 const { triage, TriageOut } = await import('./stage-triage')
 
@@ -25,6 +26,7 @@ describe('research stages anchor every search on the resolved domain', () => {
     ['triage', () => triage(company, budget()), 4, TriageOut],
     ['business', () => business(company, budget()), 6, BusinessOut],
     ['market', () => market(company, budget()), 6, MarketOut],
+    ['contacts', () => contacts(company, budget()), 5, ContactsOut],
   ] as const)('%s', async (stage, run, maxSearches, schema) => {
     await run()
     const a = lastArgs()
@@ -92,6 +94,9 @@ describe('large schemas', () => {
       await run(company, budget())
       expect(lastArgs()).toMatchObject({ constrained: false })
     }
+    // contacts is small enough for the grammar, and its unconstrained JSON came back malformed
+    await contacts(company, budget())
+    expect(lastArgs().constrained).toBeUndefined()
   })
 })
 
@@ -127,6 +132,34 @@ it('business and market cap their lists, so extraction fits in one answer', asyn
     expect(task).toMatch(/one evidence entry/)
   }
   expect(businessTask).toMatch(/company name alone/)
+})
+
+describe('contacts', () => {
+  const role = { title: 'Senior Product Designer', level_claimed: 'Senior', location: 'Bengaluru', work_policy: 'hybrid' as const, employment_type: 'permanent' as const, required_years: null, extracted_requirements: [] }
+
+  it('looks for the people tied to this role, and the recruiter when the email names one', () => {
+    const p = contactsPrompt({ ...company, role, recruiter: { name: 'Riya Placeholder', agency: 'Agency X' } })
+    expect(p).toContain('Senior Product Designer')
+    expect(p).toContain('Bengaluru')
+    expect(p).toContain('Riya Placeholder')
+    expect(p).toMatch(/hiring manager/i)
+  })
+
+  it('keeps to work information about a few relevant people, and never opens LinkedIn', () => {
+    const p = contactsPrompt({ ...company, role, recruiter: null })
+    expect(p).not.toContain('Riya')
+    expect(p).toMatch(/do not list employees who are not tied to this role/i)
+    expect(p).toMatch(/no personal contact details/i)
+    expect(p).toMatch(/LinkedIn/)
+  })
+
+  it('caps the list and requires each person to be a sourced claim', () => {
+    const ev = { url: 'https://www.linkedin.com/in/someone', title: 't', publisher: null, published_at: null, retrieved_at: '2026-11-13T00:00:00.000Z', snippet: 's', trust_tier: 'tertiary' }
+    const person = { value: { name: 'A', title: 'Design Manager', relation: 'hiring_manager', match: 'possible', why: 'w' }, confidence: 'unverified', evidence: [ev], as_of: null }
+    expect(ContactsOut.safeParse({ contacts: [person], gaps: [] }).success).toBe(true)
+    expect(ContactsOut.safeParse({ contacts: Array(7).fill(person), gaps: [] }).success).toBe(false)
+    expect(ContactsOut.safeParse({ contacts: [{ ...person, evidence: [] }], gaps: [] }).success).toBe(false)
+  })
 })
 
 it('triage asks for a recommendation addressed to the candidate', async () => {

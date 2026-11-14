@@ -4,7 +4,7 @@ import { CompanyResearch, TriageResult } from '../types/research'
 import type { RunEvent } from './run'
 
 const m = vi.hoisted(() => ({
-  parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
+  parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), contacts: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
 }))
 vi.mock('./stage0-parse', () => ({ parse: m.parse }))
 vi.mock('./stage1-resolve', async (orig) => ({ ...(await orig<typeof import('./stage1-resolve')>()), resolve: m.resolve }))
@@ -12,6 +12,7 @@ vi.mock('./stage2-business', () => ({ business: m.business }))
 vi.mock('./stage3-money', () => ({ money: m.money }))
 vi.mock('./stage4-people', () => ({ people: m.people }))
 vi.mock('./stage5-market', () => ({ market: m.market }))
+vi.mock('./stage6-contacts', () => ({ contacts: m.contacts }))
 vi.mock('./stage8-synthesize', () => ({ synthesize: m.synthesize }))
 vi.mock('./stage-triage', () => ({ triage: m.triage }))
 vi.mock('../util/cost', async (orig) => {
@@ -43,6 +44,7 @@ beforeEach(() => {
   m.people.mockResolvedValue(ok(peopleOut))
   m.business.mockResolvedValue(ok(businessOut))
   m.market.mockResolvedValue(ok(marketOut))
+  m.contacts.mockResolvedValue(ok({ contacts: [], gaps: [] }))
   m.synthesize.mockResolvedValue({ data: synthOut, dropped: [] })
   m.triage.mockResolvedValue(ok({ flags: [], deep_dive: { recommended: true, reason: 'layoffs' }, gaps: ['thin'] }))
 })
@@ -53,13 +55,29 @@ describe('deep run', () => {
     if (o.kind !== 'report') throw new Error(o.kind)
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report.partial).toBe(false)
-    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', business: 'ok', money: 'ok', people: 'ok', market: 'ok', synthesize: 'ok' })
+    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', business: 'ok', money: 'ok', people: 'ok', market: 'ok', contacts: 'ok', synthesize: 'ok' })
+    expect(o.report.contacts).toEqual([])
     expect(o.report.money.ownership_type?.value).toBe('vc_backed')
     expect(o.report.business?.summary?.value).toBe('Makes things.')
     expect(o.report.market?.ai_stance?.value).toBe('ai_core')
     expect(o.report).toMatchObject({ outlook: 'Steady.', questions_to_ask: ['q1', 'q2', 'q3', 'q4', 'q5', 'q6'] })
     expect(o.report.questions[0]).toEqual({ question: 'q1', why: 'w', topic: 'role' })
     expect(o.report.gaps).toEqual(['no reviews', 'no comp', 'no revenue', 'no news'])
+  })
+
+  it('passes the role and the recruiter’s name, never their email, to the contacts stage', async () => {
+    m.parse.mockResolvedValue({ ...parsed, recruiter: { name: 'Riya', email: 'riya@agency.example', agency: 'Agency' } })
+    await runResearch({ text: 't', mode: 'deep', profile: null })
+    const input = m.contacts.mock.calls[0]![0]
+    expect(input).toMatchObject({ domain: 'example.com', role: { title: 'Designer' }, recruiter: { name: 'Riya', agency: 'Agency' } })
+    expect(JSON.stringify(input)).not.toContain('riya@')
+  })
+
+  it('a failed contacts stage leaves people to know unresearched (null), not empty', async () => {
+    m.contacts.mockRejectedValue(new Error('boom'))
+    const o = await runResearch({ text: 't', mode: 'deep', profile: null })
+    if (o.kind !== 'report') throw new Error(o.kind)
+    expect(o.report.contacts).toBeNull()
   })
 
   it('a failed business or market stage leaves its section empty, not the report', async () => {
