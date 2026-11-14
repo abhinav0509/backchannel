@@ -32,9 +32,12 @@ export const jsonSerialize = (x: unknown) => (typeof x === 'string' ? x : JSON.s
 export function openDb(url = process.env.DATABASE_URL ?? defaultUrl()): Db {
   if (url.startsWith('postgres://') || url.startsWith('postgresql://')) {
     // prepare: false because Supabase's transaction pooler does not support prepared statements.
+    // max_pipeline: 1 because queries pipelined behind a busy connection never return through that
+    // pooler: past `max` parallel queries the page hung until the 300s function limit.
     const sql = postgres(url, {
       prepare: false,
       max: 5,
+      max_pipeline: 1,
       idle_timeout: 20,
       onnotice: () => {},
       types: { json: { to: 114, from: [114, 3802], serialize: jsonSerialize, parse: (x: string) => JSON.parse(x) as unknown } },
