@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { useTestDb } from '../db/db'
+import { BUDGETS } from '../config'
 import { Budget, BudgetExceeded, costUsd, monthSpend, runBudget, runSpend } from './cost'
 
 const u = (input: number, output: number, searches = 0) => ({ input, output, cacheRead: 0, cacheWrite: 0, searches })
@@ -65,7 +66,7 @@ describe('ledger', () => {
     first.charge('money', 'claude-sonnet-5-5', u(1000, 0, 7))
     await first.flush()
     const second = await runBudget('deep', 'r')
-    expect(second.remainingSearches).toBe(33)
+    expect(second.remainingSearches).toBe(BUDGETS.deep.searchesPerRun - 7)
     expect(await runSpend('r')).toMatchObject({ searches: 7, stages: { money: { searches: 7 } } })
   })
 

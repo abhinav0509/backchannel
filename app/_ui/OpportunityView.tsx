@@ -15,7 +15,7 @@ import { MenuItem, Popover } from './Popover'
 import { Progress } from './Progress'
 import { Brief } from './report/Brief'
 import { Prep } from './report/Prep'
-import { AiTab, CompanyTab, MoneyTab, OutlookTab, PeopleTab } from './report/tabs'
+import { AiTab, CompanyTab, MoneyTab, OutlookTab, PeopleTab, PressTab } from './report/tabs'
 import { Tracker } from './report/Tracker'
 import { RunView } from './RunView'
 import { StagePicker } from './StagePicker'
@@ -28,6 +28,7 @@ const LABEL: Record<Tab, string> = {
   money: 'Money',
   ai: 'AI',
   outlook: 'Outlook',
+  press: 'In the press',
   prep: 'Prep',
   sources: 'Sources',
 }
@@ -259,7 +260,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
         {tabs.length > 0 && (
           <>
             <div className="sticky top-14 z-20 -mx-4 mt-8 border-b border-line-soft bg-canvas/85 px-4 backdrop-blur-xl sm:-mx-6 sm:px-6 lg:top-0 lg:-mx-10 lg:px-10">
-              <TabBar tabs={tabs} value={tab} onChange={choose} badge={{ prep: r?.questions.length ? `${askedCount}/${r.questions.length}` : undefined, sources: index.size ? String(index.size) : undefined }} />
+              <TabBar tabs={tabs} value={tab} onChange={choose} badge={{ press: r?.press ? String(r.press.coverage.length + r.press.own.length) : undefined, prep: r?.questions.length ? `${askedCount}/${r.questions.length}` : undefined, sources: index.size ? String(index.size) : undefined }} />
             </div>
 
             <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="fill-in pt-8">
@@ -276,6 +277,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
               {r && tab === 'money' && <MoneyTab r={r} />}
               {r && tab === 'ai' && <AiTab r={r} {...deep} />}
               {r && tab === 'outlook' && <OutlookTab r={r} {...deep} />}
+              {r && tab === 'press' && <PressTab r={r} {...deep} />}
               {r && tab === 'prep' && (
                 <Prep
                   id={o.id}

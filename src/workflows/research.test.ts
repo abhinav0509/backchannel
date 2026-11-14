@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { useTestDb } from '../db/db'
 import { CompanyResearch, TriageResult } from '../types/research'
 
-const m = vi.hoisted(() => ({ parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), contacts: vi.fn(), synthesize: vi.fn(), triage: vi.fn() }))
+const m = vi.hoisted(() => ({ parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), contacts: vi.fn(), press: vi.fn(), synthesize: vi.fn(), triage: vi.fn() }))
 vi.mock('../pipeline/stage0-parse', () => ({ parse: m.parse }))
 vi.mock('../pipeline/stage1-resolve', async (orig) => ({ ...(await orig<typeof import('../pipeline/stage1-resolve')>()), resolve: m.resolve }))
 vi.mock('../pipeline/stage2-business', () => ({ business: m.business }))
@@ -10,6 +10,7 @@ vi.mock('../pipeline/stage3-money', () => ({ money: m.money }))
 vi.mock('../pipeline/stage4-people', () => ({ people: m.people }))
 vi.mock('../pipeline/stage5-market', () => ({ market: m.market }))
 vi.mock('../pipeline/stage6-contacts', () => ({ contacts: m.contacts }))
+vi.mock('../pipeline/stage7-press', () => ({ press: m.press }))
 vi.mock('../pipeline/stage8-synthesize', () => ({ synthesize: m.synthesize }))
 vi.mock('../pipeline/stage-triage', () => ({ triage: m.triage }))
 
@@ -44,6 +45,7 @@ beforeEach(async () => {
   m.business.mockResolvedValue(ok(businessOut))
   m.market.mockResolvedValue(ok(marketOut))
   m.contacts.mockResolvedValue(ok({ contacts: [], gaps: [] }))
+  m.press.mockResolvedValue(ok({ coverage: [], own: [], gaps: [] }))
   m.synthesize.mockResolvedValue({ data: synthOut, dropped: [] })
   m.triage.mockResolvedValue(ok({ flags: [], deep_dive: { recommended: true, reason: 'layoffs' }, gaps: [] }))
 })
@@ -56,7 +58,7 @@ describe('researchWorkflow', () => {
     expect(o).toMatchObject({ status: 'done', domain: 'example.com', company: 'Example' })
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report!.gaps.slice(0, 2)).toEqual(['no comp', 'no founding year'])
-    expect(o.events.map((e) => `${e.stage}:${e.status}`)).toEqual(expect.arrayContaining(['parse:ok', 'resolve:ok', 'business:ok', 'money:ok', 'people:ok', 'market:ok', 'contacts:ok', 'synthesize:ok']))
+    expect(o.events.map((e) => `${e.stage}:${e.status}`)).toEqual(expect.arrayContaining(['parse:ok', 'resolve:ok', 'business:ok', 'money:ok', 'people:ok', 'market:ok', 'contacts:ok', 'press:ok', 'synthesize:ok']))
     expect(o.runs[0]).toMatchObject({ status: 'done' })
   })
 

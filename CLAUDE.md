@@ -12,7 +12,7 @@ Work test-first: write the failing test, then the code.
 
 Your pipeline stage (`src/types/tracking.ts`: New to Closed, with a reason when passing or closing),
 notes, next step and prep answers are edited by hand and live on the opportunity row, apart from
-research. Deep runs: business, money, people, market and contacts stages in parallel, then synthesis.
+research. Deep runs: business, money, people, market, contacts and press stages in parallel, then synthesis.
 
 ## Principles that override convenience
 

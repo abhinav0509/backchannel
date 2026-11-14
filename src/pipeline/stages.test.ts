@@ -12,6 +12,7 @@ const { people, PeopleOut } = await import('./stage4-people')
 const { business, BusinessOut } = await import('./stage2-business')
 const { market, MarketOut } = await import('./stage5-market')
 const { contacts, ContactsOut, contactsPrompt } = await import('./stage6-contacts')
+const { press, PressOut, pressPrompt, pressTask } = await import('./stage7-press')
 const { synthesize, SynthOut } = await import('./stage8-synthesize')
 const { triage, TriageOut } = await import('./stage-triage')
 
@@ -27,6 +28,7 @@ describe('research stages anchor every search on the resolved domain', () => {
     ['business', () => business(company, budget()), 6, BusinessOut],
     ['market', () => market(company, budget()), 6, MarketOut],
     ['contacts', () => contacts(company, budget()), 5, ContactsOut],
+    ['press', () => press(company, budget()), 5, PressOut],
   ] as const)('%s', async (stage, run, maxSearches, schema) => {
     await run()
     const a = lastArgs()
@@ -160,6 +162,34 @@ describe('contacts', () => {
     expect(ContactsOut.safeParse({ contacts: Array(7).fill(person), gaps: [] }).success).toBe(false)
     expect(ContactsOut.safeParse({ contacts: [{ ...person, evidence: [] }], gaps: [] }).success).toBe(false)
   })
+})
+
+describe('press', () => {
+  it('looks for media coverage and the company’s own posts, design and engineering blogs included', () => {
+    const p = pressPrompt(company)
+    expect(p).toMatch(/last 12 months/i)
+    expect(p).toMatch(/design blog/i)
+    expect(p).toMatch(/engineering blog/i)
+    expect(p).toMatch(/do not open/i)
+  })
+
+  it('judges the angle from the snippet, separates media from the company, and caps both lists', () => {
+    expect(pressTask).toMatch(/angle/)
+    expect(pressTask).toMatch(/null for the company.s own/i)
+    expect(pressTask).toMatch(/press release.*own/i)
+    const ev = { url: 'https://news.example/a', title: 't', publisher: null, published_at: null, retrieved_at: '2026-11-13T00:00:00.000Z', snippet: 's', trust_tier: 'secondary' }
+    const item = { value: { title: 'T', publisher: 'P', date: '2026-10', kind: 'news', summary: 's', angle: 'critical' }, confidence: 'reported', evidence: [ev], as_of: null }
+    expect(PressOut.safeParse({ coverage: [item], own: [], gaps: [] }).success).toBe(true)
+    expect(PressOut.safeParse({ coverage: Array(9).fill(item), own: [], gaps: [] }).success).toBe(false)
+    expect(PressOut.safeParse({ coverage: [{ ...item, value: { ...item.value, angle: 'glowing' } }], own: [], gaps: [] }).success).toBe(false)
+  })
+})
+
+it('synthesis reads the press coverage too', async () => {
+  const { synthPrompt } = await import('./stage8-synthesize')
+  const { validReport } = await import('../test/fixtures')
+  const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, ...draft } = validReport()
+  expect(synthPrompt({ ...draft, press: { coverage: [], own: [] } }, null)).toContain('"press"')
 })
 
 it('triage asks for a recommendation addressed to the candidate', async () => {

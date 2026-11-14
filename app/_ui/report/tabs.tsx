@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react'
 import { roleTitle } from '../../../src/report/markdown'
-import type { AiStance, CompanyResearch, ContactRelation } from '../../../src/types/research'
+import type { AiStance, CompanyResearch, ContactRelation, PressItem } from '../../../src/types/research'
 import { ownershipLabel } from '../../_lib/format'
 import { linkedinSearch, profileUrl, roleSearches } from '../../_lib/linkedin'
 import { Cites, Confidence } from '../Evidence'
@@ -499,6 +499,105 @@ export function OutlookTab({ r, ...deep }: { r: R } & Deep) {
           <Claims items={k.headwinds} empty="None found.">
             {(v) => v}
           </Claims>
+        </Section>
+      </div>
+    </div>
+  )
+}
+
+const KIND: Record<PressItem['kind'], string> = {
+  news: 'News',
+  analysis: 'Analysis',
+  newsroom: 'Newsroom',
+  company_blog: 'Company blog',
+  design_blog: 'Design blog',
+  engineering_blog: 'Engineering blog',
+}
+const ANGLE = {
+  positive: { label: 'Positive', color: 'var(--green)', soft: 'bg-green-soft text-green' },
+  neutral: { label: 'Neutral', color: 'var(--line-strong)', soft: 'bg-sunken text-ink-2' },
+  critical: { label: 'Critical', color: 'var(--risk)', soft: 'bg-risk-soft text-risk' },
+} as const
+
+function Article({ c }: { c: C<PressItem> }) {
+  const p = c.value
+  const href = c.evidence[0]?.url
+  const design = p.kind === 'design_blog'
+  return (
+    <li className={`card p-4 ${design ? 'shadow-[0_0_0_1.5px_var(--accent)]' : ''}`}>
+      <p className="flex flex-wrap items-center gap-x-3 gap-y-1 t-micro text-ink-3">
+        <span className={`font-medium ${design ? 'text-accent' : ''}`}>{KIND[p.kind]}</span>
+        {p.publisher && <span>{p.publisher}</span>}
+        {p.date && <span className="tabular-nums">{p.date}</span>}
+        {p.angle && <span className={`rounded-full px-2 py-0.5 font-medium ${ANGLE[p.angle].soft}`}>{ANGLE[p.angle].label}</span>}
+      </p>
+      <p className="mt-1.5 font-semibold leading-snug">
+        {href ? (
+          <a href={href} target="_blank" rel="noreferrer" className="hover:text-accent">
+            {p.title}
+          </a>
+        ) : (
+          p.title
+        )}
+        <Cites urls={urls(c)} />
+      </p>
+      <p className="mt-1 t-small text-ink-2">{p.summary}</p>
+    </li>
+  )
+}
+
+/** What the media says next to what the company says about itself: the gap between them is worth asking about. */
+export function PressTab({ r, ...deep }: { r: R } & Deep) {
+  const p = r.press
+  if (!p) return <NotYet what="Articles about the company from the last year with the angle each takes, beside its own newsroom, product, design and engineering blog posts." {...deep} />
+  const counts = (['positive', 'neutral', 'critical'] as const).map((a) => ({ a, n: p.coverage.filter((c) => c.value.angle === a).length }))
+  const total = counts.reduce((s, x) => s + x.n, 0)
+  const byDate = <T extends { value: { date: string | null } }>(xs: T[]) => [...xs].sort((a, b) => (b.value.date ?? '').localeCompare(a.value.date ?? ''))
+  return (
+    <div className="space-y-12">
+      {total > 0 && (
+        <section aria-labelledby="tone" className="card p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="tone" className="font-semibold">
+              How the media frames them
+            </h2>
+            <span className="t-micro text-ink-3">Our read of each headline and snippet, not of the full article</span>
+          </div>
+          <div className="mt-4 flex h-2.5 overflow-hidden rounded-full bg-sunken" role="img" aria-label={counts.map((x) => `${x.n} ${x.a}`).join(', ')}>
+            {counts.map((x) => x.n > 0 && <span key={x.a} style={{ width: `${(x.n / total) * 100}%`, background: ANGLE[x.a].color }} />)}
+          </div>
+          <p className="mt-3 flex flex-wrap gap-x-5 t-small">
+            {counts.map((x) => (
+              <span key={x.a} className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full" style={{ background: ANGLE[x.a].color }} aria-hidden />
+                <span className="font-semibold tabular-nums">{x.n}</span> {ANGLE[x.a].label.toLowerCase()}
+              </span>
+            ))}
+          </p>
+        </section>
+      )}
+      <div className="grid gap-10 lg:grid-cols-2 lg:gap-6">
+        <Section title="What the media says" aside="Last 12 months" id="coverage">
+          {p.coverage.length ? (
+            <ul className="space-y-2">
+              {byDate(p.coverage).map((c, i) => (
+                <Article key={i} c={c} />
+              ))}
+            </ul>
+          ) : (
+            <p className="t-small text-ink-3">No substantive coverage turned up in the last year.</p>
+          )}
+        </Section>
+        <Section title="What they say about themselves" id="own">
+          {p.own.length ? (
+            <ul className="space-y-2">
+              {byDate(p.own).map((c, i) => (
+                <Article key={i} c={c} />
+              ))}
+            </ul>
+          ) : (
+            <p className="t-small text-ink-3">No newsroom, blog, design or engineering posts turned up.</p>
+          )}
         </Section>
       </div>
     </div>

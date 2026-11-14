@@ -8,6 +8,7 @@ import { money, type MoneyOut } from '../pipeline/stage3-money'
 import { people, type PeopleOut } from '../pipeline/stage4-people'
 import { market, type MarketOut } from '../pipeline/stage5-market'
 import { contacts, type ContactsInput, type ContactsOut } from '../pipeline/stage6-contacts'
+import { press, type PressOut } from '../pipeline/stage7-press'
 import { synthesize, type Draft, type SynthOut } from '../pipeline/stage8-synthesize'
 import { triage, type TriageOut } from '../pipeline/stage-triage'
 import { getDb } from '../db/db'
@@ -69,13 +70,14 @@ export async function resolveStep(c: Ctx, parsed: ParseOut): Promise<GateResult>
   return g
 }
 
-const STAGES = { business, money, people, market, contacts, triage } as const
+const STAGES = { business, money, people, market, contacts, press, triage } as const
 interface StageOut {
   business: BusinessOut
   money: MoneyOut
   people: PeopleOut
   market: MarketOut
   contacts: ContactsOut
+  press: PressOut
   triage: TriageOut
 }
 

@@ -17,7 +17,7 @@ export function validReport(o: { name?: string; domain?: string } = {}): Company
     money: { ownership_type: claim('pe_backed'), funding_events: [], revenue_signal: null, profitability: null, exit_activity: [] },
     people: { headcount: null, headcount_trend: null, layoff_events: [], leadership_changes: [], review_scores: [] },
     role: { title: 'Product Designer', level_claimed: 'Lead', location: 'Remote', work_policy: 'remote', employment_type: 'permanent', required_years: null, extracted_requirements: [] },
-    business: null, market: null, contacts: null,
+    business: null, market: null, contacts: null, press: null,
     flags: [], scores: [], questions_to_ask: [], questions: [], verdict: 'Placeholder verdict.', outlook: null, gaps: [],
     run: { mode: 'deep', searches_used: 10, input_tokens: 100, output_tokens: 10, cost_usd: 1, duration_ms: 1000, stage_status: { parse: 'ok' } },
   }

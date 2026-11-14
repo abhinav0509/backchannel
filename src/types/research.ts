@@ -108,7 +108,7 @@ export const Score = z.object({
 })
 
 export const StageName = z.enum([
-  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'contacts', 'local', 'role', 'synthesize',
+  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'contacts', 'press', 'local', 'role', 'synthesize',
 ])
 
 export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
@@ -184,6 +184,25 @@ export const Contact = z.object({
   why: z.string(), // why this person matters to the candidate
 })
 
+/**
+ * One article or post. Its link is the claim's evidence URL: a search result, never a page we
+ * invented. summary and angle come from the search snippet, so the angle is a read, not a fact.
+ */
+export const PressItem = z.object({
+  title: z.string(),
+  publisher: z.string().nullable(),
+  date: PartialDate.nullable(),
+  kind: z.enum(['news', 'analysis', 'newsroom', 'company_blog', 'design_blog', 'engineering_blog']),
+  summary: z.string(),
+  angle: z.enum(['positive', 'neutral', 'critical']).nullable(), // how the piece frames the company; null for the company's own posts
+})
+
+/** What the media says about the company, and what the company says about itself. */
+export const Press = z.object({
+  coverage: z.array(claim(PressItem)).max(8),
+  own: z.array(claim(PressItem)).max(6),
+})
+
 export const QuestionTopic = z.enum(['role', 'team', 'company', 'money', 'future', 'ai', 'culture', 'comp'])
 
 /** An interview question, why it is worth asking, and what it is about. */
@@ -233,6 +252,7 @@ export const CompanyResearch = z.object({
   business: Business.nullable().default(null),
   market: Market.nullable().default(null),
   contacts: z.array(claim(Contact)).max(6).nullable().default(null),
+  press: Press.nullable().default(null),
 
   role: Role,
   flags: z.array(Flag),
@@ -272,6 +292,8 @@ export type Business = z.infer<typeof Business>
 export type Market = z.infer<typeof Market>
 export type Question = z.infer<typeof Question>
 export type Contact = z.infer<typeof Contact>
+export type Press = z.infer<typeof Press>
+export type PressItem = z.infer<typeof PressItem>
 export type ContactRelation = z.infer<typeof ContactRelation>
 export type QuestionTopic = z.infer<typeof QuestionTopic>
 export type AiStance = z.infer<typeof AiStance>

@@ -8,6 +8,7 @@ import { money, type MoneyOut } from './stage3-money'
 import { people, type PeopleOut } from './stage4-people'
 import { market, type MarketOut } from './stage5-market'
 import { contacts, type ContactsOut } from './stage6-contacts'
+import { press, type PressOut } from './stage7-press'
 import { synthesize, type Draft, type SynthOut } from './stage8-synthesize'
 import { triage, type TriageOut } from './stage-triage'
 
@@ -90,10 +91,11 @@ export interface DeepStages {
   people: StageResult<PeopleOut>
   market: StageResult<MarketOut>
   contacts: StageResult<ContactsOut>
+  press: StageResult<PressOut>
 }
 
 export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGaps: string[]; totals: Totals } & DeepStages): Draft {
-  const status = { parse: 'ok', resolve: 'ok', business: statusOf(p.business), money: statusOf(p.money), people: statusOf(p.people), market: statusOf(p.market), contacts: statusOf(p.contacts) } as const
+  const status = { parse: 'ok', resolve: 'ok', business: statusOf(p.business), money: statusOf(p.money), people: statusOf(p.people), market: statusOf(p.market), contacts: statusOf(p.contacts), press: statusOf(p.press) } as const
   return {
     schema_version: 2,
     generated_at: new Date().toISOString(),
@@ -104,6 +106,7 @@ export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGa
     people: p.people.data ? strip(p.people.data) : EMPTY_PEOPLE,
     market: p.market.data ? strip(p.market.data) : null,
     contacts: p.contacts.data?.contacts ?? null,
+    press: p.press.data ? strip(p.press.data) : null,
     role: p.parsed.role,
     gaps: unique([
       ...p.resolveGaps,
@@ -112,6 +115,7 @@ export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGa
       ...stageGaps('people', p.people),
       ...stageGaps('market', p.market),
       ...stageGaps('contacts', p.contacts),
+      ...stageGaps('press', p.press),
     ]),
     run: runField('deep', p.totals, status),
   }
@@ -217,14 +221,15 @@ export async function runResearch(input: {
     return { kind: 'triage', result: assembleTriage({ parsed, identity: g.identity, resolveGaps: g.gaps, triage: t, totals: totals() }), budget }
   }
 
-  const [b, m, p, k, c] = await Promise.all([
+  const [b, m, p, k, c, pr] = await Promise.all([
     stage('business', () => business(g.identity, budget)),
     stage('money', () => money(g.identity, budget)),
     stage('people', () => people(g.identity, budget)),
     stage('market', () => market(g.identity, budget)),
     stage('contacts', () => contacts(contactsInput(g.identity, parsed), budget)),
+    stage('press', () => press(g.identity, budget)),
   ])
-  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, business: b, money: m, people: p, market: k, contacts: c, totals: totals() })
+  const draft = draftReport({ parsed, identity: g.identity, resolveGaps: g.gaps, business: b, money: m, people: p, market: k, contacts: c, press: pr, totals: totals() })
   const s = await stage('synthesize', () => synthesize({ draft, profile: input.profile }, budget))
   return { kind: 'report', report: assembleReport(draft, s, totals()), budget }
 }

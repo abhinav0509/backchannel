@@ -26,7 +26,7 @@ export const synthSystem = `You turn sourced company research into a decision ai
 You are direct. You state the main risk plainly. You never add facts that are not in the research, and you never present an inference as a fact.`
 
 // Only the findings: run bookkeeping changes every run and would only add noise and bust the cache.
-const findings = ({ identity, business, money, people, market, role, gaps }: Draft) => ({ identity, business, money, people, market, role, gaps })
+const findings = ({ identity, business, money, people, market, press, role, gaps }: Draft) => ({ identity, business, money, people, market, press, role, gaps })
 
 export const synthTask = `From the research below, produce:
 - flags: risk and green flags from this fixed taxonomy only: ${Flag.shape.kind.options.join(', ')}.
@@ -35,7 +35,7 @@ export const synthTask = `From the research below, produce:
 - scores: exactly one per dimension (${ScoreDimension.options.join(', ')}), 0 to 100, with a one or two sentence rationale and the evidence URLs behind it (copied from the research). Set unknown true when there is not enough to judge; comp_confidence is unknown unless compensation is actually sourced.
 - questions: 6 to 12 questions for the candidate to ask in interviews, each specific to something found or to a gap. No generic questions. For each: why, one sentence naming the finding or gap that makes it worth asking; topic, one of ${QuestionTopic.options.join(', ')}. Cover the role and team, not only the company.
 - verdict: 3 to 5 sentences. Lead with the main risk, stated plainly.
-- outlook: 2 to 4 sentences on where the company looks to be heading, drawn only from the research (strategy, news, money, AI, headwinds). It is read as your judgement, so reason from the findings and do not introduce new facts.
+- outlook: 2 to 4 sentences on where the company looks to be heading, drawn only from the research (strategy, news, press coverage, money, AI, headwinds). It is read as your judgement, so reason from the findings and do not introduce new facts.
 - gaps: what could not be established and why it matters for this decision.`
 
 export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK

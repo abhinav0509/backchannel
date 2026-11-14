@@ -56,6 +56,8 @@ function finding(e: RunEvent | undefined): string | null {
       const n = out.contacts?.length ?? 0
       return n ? `${n} ${n === 1 ? 'person' : 'people'} found` : 'Nobody tied to the role found'
     }
+    case 'press':
+      return `${out.coverage?.length ?? 0} articles, ${out.own?.length ?? 0} of their own posts`
     case 'triage':
       return out.deep_dive?.reason ?? null
     default:

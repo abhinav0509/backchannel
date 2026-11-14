@@ -61,6 +61,18 @@ ${
 }
 `
     : ''
+  const KIND = { news: 'News', analysis: 'Analysis', newsroom: 'Newsroom', company_blog: 'Company blog', design_blog: 'Design blog', engineering_blog: 'Engineering blog' } as const
+  const pressSection = r.press
+    ? `
+## In the press
+
+${claims(r.press.coverage, (p) => `${[p.date, p.publisher].filter(Boolean).join(', ')}${p.date || p.publisher ? ': ' : ''}${p.title}${p.angle ? ` (${p.angle})` : ''}\n  ${p.summary}`)}
+
+### What they say about themselves
+
+${claims(r.press.own, (p) => `${KIND[p.kind]}: ${p.title}${p.date ? `, ${p.date}` : ''}\n  ${p.summary}`)}
+`
+    : ''
   const businessSection = biz
     ? `
 ## What they do
@@ -147,7 +159,7 @@ ${flags('green')}
 ## Questions to ask
 
 ${questions}
-${businessSection}${contactsSection}${marketSection}
+${businessSection}${contactsSection}${marketSection}${pressSection}
 ## Company
 
 - Legal name: ${claim(id.legal_name)}

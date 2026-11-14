@@ -33,6 +33,10 @@ const report = (): CompanyResearch => ({
     recent_news: [c({ date: '2026-09', headline: 'Placeholder launch' }, [B])], tailwinds: [], headwinds: [],
   },
   contacts: [c({ name: 'Person Placeholder', title: 'Design Manager', relation: 'hiring_manager', match: 'possible', why: 'Likely leads the team.' }, ['https://www.linkedin.com/in/placeholder'])],
+  press: {
+    coverage: [c({ title: 'Placeholder raises doubts', publisher: 'Example Times', date: '2026-10', kind: 'news', summary: 'A placeholder summary.', angle: 'critical' }, [B])],
+    own: [c({ title: 'How we design placeholders', publisher: 'Example design blog', date: '2026-08', kind: 'design_blog', summary: 'The design team on its process.', angle: null }, [A])],
+  },
   questions_to_ask: ['How did the 2023 cuts affect design?'],
   questions: [{ question: 'How did the 2023 cuts affect design?', why: 'A 10% cut in 2023.', topic: 'team' }],
   verdict: 'Main risk is layoffs.',
@@ -62,9 +66,17 @@ describe('toMarkdown', () => {
     expect(md).toContain('https://www.linkedin.com/in/placeholder')
   })
 
+  it('lists press coverage with its angle, and the company’s own posts apart from it', () => {
+    expect(md).toContain('## In the press')
+    expect(md).toMatch(/2026-10, Example Times: Placeholder raises doubts \(critical\)/)
+    expect(md).toContain('### What they say about themselves')
+    expect(md).toMatch(/Design blog: How we design placeholders/)
+  })
+
   it('leaves the new sections out of reports made before they existed', () => {
-    const old = toMarkdown({ ...report(), business: null, market: null, contacts: null, questions: [], outlook: null })
+    const old = toMarkdown({ ...report(), business: null, market: null, contacts: null, press: null, questions: [], outlook: null })
     expect(old).not.toContain('## People to know')
+    expect(old).not.toContain('## In the press')
     expect(old).not.toContain('## What they do')
     expect(old).toContain('1. How did the 2023 cuts affect design?')
   })

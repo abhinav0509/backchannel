@@ -4,7 +4,7 @@ import { CompanyResearch, TriageResult } from '../types/research'
 import type { RunEvent } from './run'
 
 const m = vi.hoisted(() => ({
-  parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), contacts: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
+  parse: vi.fn(), resolve: vi.fn(), business: vi.fn(), money: vi.fn(), people: vi.fn(), market: vi.fn(), contacts: vi.fn(), press: vi.fn(), synthesize: vi.fn(), triage: vi.fn(),
 }))
 vi.mock('./stage0-parse', () => ({ parse: m.parse }))
 vi.mock('./stage1-resolve', async (orig) => ({ ...(await orig<typeof import('./stage1-resolve')>()), resolve: m.resolve }))
@@ -13,6 +13,7 @@ vi.mock('./stage3-money', () => ({ money: m.money }))
 vi.mock('./stage4-people', () => ({ people: m.people }))
 vi.mock('./stage5-market', () => ({ market: m.market }))
 vi.mock('./stage6-contacts', () => ({ contacts: m.contacts }))
+vi.mock('./stage7-press', () => ({ press: m.press }))
 vi.mock('./stage8-synthesize', () => ({ synthesize: m.synthesize }))
 vi.mock('./stage-triage', () => ({ triage: m.triage }))
 vi.mock('../util/cost', async (orig) => {
@@ -45,6 +46,7 @@ beforeEach(() => {
   m.business.mockResolvedValue(ok(businessOut))
   m.market.mockResolvedValue(ok(marketOut))
   m.contacts.mockResolvedValue(ok({ contacts: [], gaps: [] }))
+  m.press.mockResolvedValue(ok({ coverage: [], own: [], gaps: [] }))
   m.synthesize.mockResolvedValue({ data: synthOut, dropped: [] })
   m.triage.mockResolvedValue(ok({ flags: [], deep_dive: { recommended: true, reason: 'layoffs' }, gaps: ['thin'] }))
 })
@@ -55,8 +57,9 @@ describe('deep run', () => {
     if (o.kind !== 'report') throw new Error(o.kind)
     expect(CompanyResearch.safeParse(o.report).success).toBe(true)
     expect(o.report.partial).toBe(false)
-    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', business: 'ok', money: 'ok', people: 'ok', market: 'ok', contacts: 'ok', synthesize: 'ok' })
+    expect(o.report.run.stage_status).toEqual({ parse: 'ok', resolve: 'ok', business: 'ok', money: 'ok', people: 'ok', market: 'ok', contacts: 'ok', press: 'ok', synthesize: 'ok' })
     expect(o.report.contacts).toEqual([])
+    expect(o.report.press).toEqual({ coverage: [], own: [] })
     expect(o.report.money.ownership_type?.value).toBe('vc_backed')
     expect(o.report.business?.summary?.value).toBe('Makes things.')
     expect(o.report.market?.ai_stance?.value).toBe('ai_core')
@@ -71,6 +74,13 @@ describe('deep run', () => {
     const input = m.contacts.mock.calls[0]![0]
     expect(input).toMatchObject({ domain: 'example.com', role: { title: 'Designer' }, recruiter: { name: 'Riya', agency: 'Agency' } })
     expect(JSON.stringify(input)).not.toContain('riya@')
+  })
+
+  it('a failed press stage leaves the press unresearched (null)', async () => {
+    m.press.mockRejectedValue(new Error('boom'))
+    const o = await runResearch({ text: 't', mode: 'deep', profile: null })
+    if (o.kind !== 'report') throw new Error(o.kind)
+    expect(o.report).toMatchObject({ press: null, run: { stage_status: { press: 'failed' } } })
   })
 
   it('a failed contacts stage leaves people to know unresearched (null), not empty', async () => {

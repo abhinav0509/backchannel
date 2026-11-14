@@ -26,7 +26,7 @@ export async function researchWorkflow(c: Ctx): Promise<void> {
       return await finishStep(c, { kind: 'triage', parsed, gate, triage: t })
     }
 
-    const [business, money, people, market, contacts] = await Promise.all([
+    const [business, money, people, market, contacts, press] = await Promise.all([
       researchStep(c, 'business', gate.identity).catch(failed),
       researchStep(c, 'money', gate.identity).catch(failed),
       researchStep(c, 'people', gate.identity).catch(failed),
@@ -37,8 +37,9 @@ export async function researchWorkflow(c: Ctx): Promise<void> {
         role: parsed.role,
         recruiter: parsed.recruiter.name ? { name: parsed.recruiter.name, agency: parsed.recruiter.agency } : null,
       }).catch(failed),
+      researchStep(c, 'press', gate.identity).catch(failed),
     ])
-    const { draft, synth } = await synthStep(c, parsed, gate, { business, money, people, market, contacts })
+    const { draft, synth } = await synthStep(c, parsed, gate, { business, money, people, market, contacts, press })
     await finishStep(c, { kind: 'report', draft, synth })
   } catch (e) {
     await finishStep(c, { kind: 'failed', error: message(e) })
