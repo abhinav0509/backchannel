@@ -11,15 +11,28 @@ describe('authMode', () => {
 })
 
 describe('ownerFromClaims', () => {
-  const allowed = 'Me@Example.com, other@example.com'
-  it('accepts an allowed email, case-insensitively, and returns the user id', () =>
-    expect(ownerFromClaims({ sub: 'u-1', email: 'me@example.COM' }, allowed)).toBe('u-1'))
-  it('rejects anyone else, and a session without claims', () => {
-    expect(ownerFromClaims({ sub: 'u-2', email: 'stranger@example.com' }, allowed)).toBeNull()
-    expect(ownerFromClaims(null, allowed)).toBeNull()
-    expect(ownerFromClaims({ sub: 'u-3' }, allowed)).toBeNull()
+  const admins = 'Me@Example.com, other@example.com'
+  it('lets in an admin by email, case-insensitively, as admin', () =>
+    expect(ownerFromClaims({ sub: 'u-1', email: 'me@example.COM' }, admins)).toEqual({ id: 'u-1', role: 'admin' }))
+  it('lets in someone you invited, as a member: the tag is set server-side and a self-signup cannot set it', () =>
+    expect(ownerFromClaims({ sub: 'u-4', email: 'friend@example.com', app_metadata: { backchannel_role: 'member' } }, admins)).toEqual({ id: 'u-4', role: 'member' }))
+  it('rejects anyone else, including a tag in user-editable metadata, and a session without claims', () => {
+    expect(ownerFromClaims({ sub: 'u-2', email: 'stranger@example.com' }, admins)).toBeNull()
+    expect(ownerFromClaims({ sub: 'u-5', email: 'x@example.com', user_metadata: { backchannel_role: 'member' } } as never, admins)).toBeNull()
+    expect(ownerFromClaims(null, admins)).toBeNull()
+    expect(ownerFromClaims({ sub: 'u-3' }, admins)).toBeNull()
   })
   it('the local owner is a fixed uuid', () => expect(LOCAL_OWNER).toMatch(/^[0-9a-f-]{36}$/))
+})
+
+describe('isAdminOwner', () => {
+  it('the admin is BACKCHANNEL_OWNER (the local owner without it); everyone else is a member', async () => {
+    const { isAdminOwner } = await import('./auth')
+    const env = { BACKCHANNEL_OWNER: '719a2c31-2a0a-406d-befb-ae930cc55978' }
+    expect(isAdminOwner('719a2c31-2a0a-406d-befb-ae930cc55978', env)).toBe(true)
+    expect(isAdminOwner('00000000-0000-0000-0000-00000000000a', env)).toBe(false)
+    expect(isAdminOwner(LOCAL_OWNER, {})).toBe(true)
+  })
 })
 
 describe('missingConfig', () => {

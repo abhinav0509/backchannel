@@ -41,6 +41,7 @@ const report = (): CompanyResearch => ({
   questions: [{ question: 'How did the 2023 cuts affect design?', why: 'A 10% cut in 2023.', topic: 'team' }],
   verdict: 'Main risk is layoffs.',
   outlook: 'Placeholder outlook.',
+  fit: { summary: 'A fair fit.', strengths: ['Fintech checkout work'], gaps: ['No B2B'], talking_points: ['Your checkout redesign'] },
   gaps: ['Compensation could not be established.'],
   run: { mode: 'deep', searches_used: 12, input_tokens: 1000, output_tokens: 100, cost_usd: 1.234, duration_ms: 200_000, stage_status: { money: 'ok', people: 'partial' } },
 })
@@ -66,6 +67,13 @@ describe('toMarkdown', () => {
     expect(md).toContain('https://www.linkedin.com/in/placeholder')
   })
 
+  it('says how the role fits the candidate, right after the verdict', () => {
+    expect(md).toContain('## How you fit')
+    expect(md.indexOf('## How you fit')).toBeLessThan(md.indexOf('## Scores'))
+    expect(md).toMatch(/Strengths\n\n- Fintech checkout work/)
+    expect(md).toMatch(/Talking points\n\n- Your checkout redesign/)
+  })
+
   it('lists press coverage with its angle, and the company’s own posts apart from it', () => {
     expect(md).toContain('## In the press')
     expect(md).toMatch(/2026-10, Example Times: Placeholder raises doubts \(critical\)/)
@@ -74,9 +82,10 @@ describe('toMarkdown', () => {
   })
 
   it('leaves the new sections out of reports made before they existed', () => {
-    const old = toMarkdown({ ...report(), business: null, market: null, contacts: null, press: null, questions: [], outlook: null })
+    const old = toMarkdown({ ...report(), business: null, market: null, contacts: null, press: null, questions: [], outlook: null, fit: null })
     expect(old).not.toContain('## People to know')
     expect(old).not.toContain('## In the press')
+    expect(old).not.toContain('## How you fit')
     expect(old).not.toContain('## What they do')
     expect(old).toContain('1. How did the 2023 cuts affect design?')
   })

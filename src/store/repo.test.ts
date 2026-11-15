@@ -118,6 +118,38 @@ describe('tracking', () => {
   })
 })
 
+describe('rounds', () => {
+  it('adds rounds in date order, unscheduled last, and shows them on the opportunity', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await repo.addRound(ME, o.id, { kind: 'panel', at: '2026-11-25T10:00:00+05:30' })
+    await repo.addRound(ME, o.id, { kind: 'recruiter_screen', at: '2026-11-18T09:30:00Z', interviewers: ['Riya'] })
+    await repo.addRound(ME, o.id, { kind: 'final' })
+    const got = (await repo.getOpportunity(ME, o.id))!
+    expect(got.rounds.map((r) => r.kind)).toEqual(['recruiter_screen', 'panel', 'final'])
+    expect(got.rounds[0]).toMatchObject({ at: '2026-11-18T09:30:00.000Z', format: 'video', interviewers: ['Riya'], outcome: 'pending', notes: '' })
+    expect(got.rounds[1]!.at).toBe('2026-11-25T04:30:00.000Z')
+  })
+
+  it('updates and deletes a round for its owner only', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const r = await repo.addRound(ME, o.id, { kind: 'hiring_manager' })
+    await repo.updateRound(ME, r.id, { outcome: 'passed', notes: 'Went well.' })
+    expect((await repo.getOpportunity(ME, o.id))!.rounds[0]).toMatchObject({ outcome: 'passed', notes: 'Went well.' })
+    await expect(repo.updateRound(OTHER, r.id, { outcome: 'rejected' })).rejects.toThrow(/no round/)
+    expect(await repo.deleteRound(OTHER, r.id)).toBe(false)
+    expect(await repo.deleteRound(ME, r.id)).toBe(true)
+    expect((await repo.getOpportunity(ME, o.id))!.rounds).toEqual([])
+  })
+
+  it('rejects a round on someone else’s opportunity, and bad input', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await expect(repo.addRound(OTHER, o.id, { kind: 'panel' })).rejects.toThrow(/no opportunity/)
+    await expect(repo.addRound(ME, o.id, { kind: 'tea' as never })).rejects.toThrow()
+    await expect(repo.addRound(ME, o.id, {} as never)).rejects.toThrow()
+    await expect(repo.addRound(ME, o.id, { kind: 'panel', at: 'next tuesday' })).rejects.toThrow()
+  })
+})
+
 describe('runs and events', () => {
   it('a run moves the opportunity to running, collects events in order and records its spend', async () => {
     const o = await repo.createOpportunity(ME, 'x')

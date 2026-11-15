@@ -4,7 +4,7 @@ import { getDb } from '../db/db'
 import { Candidate } from '../pipeline/stage1-resolve'
 import { Profile } from '../types/profile'
 import { CompanyResearch, RunEvent, StageName, TriageResult, type StageStatus } from '../types/research'
-import { Pipeline, PipelineReason, PrepEntry, TrackingPatch } from '../types/tracking'
+import { Pipeline, PipelineReason, PrepEntry, Round, RoundPatch, TrackingPatch } from '../types/tracking'
 import { runSpend } from '../util/cost'
 
 // Every function takes the owner and scopes its query by it. The server connects as a role that
@@ -53,6 +53,7 @@ export const Opportunity = z.object({
   next_step: z.string().nullable(),
   next_step_at: z.string().nullable(),
   prep: z.record(z.string(), PrepEntry),
+  rounds: z.array(Round),
 })
 export type Opportunity = z.infer<typeof Opportunity>
 
@@ -137,6 +138,7 @@ export async function getOpportunity(owner: string, oppId: string): Promise<Oppo
       }
     }),
   )
+  const rounds = await listRounds(owner, oppId)
   const stalled = row.status === 'running' && latest?.stalled
   return Opportunity.parse({
     ...row,
@@ -147,6 +149,7 @@ export async function getOpportunity(owner: string, oppId: string): Promise<Oppo
     error: stalled ? 'Research stalled and was stopped. Start it again.' : row.error,
     events: events.map((e) => ({ stage: e.stage, status: e.status, at: iso(e.at), ...(e.output != null && { output: e.output }), ...(e.error && { error: e.error }) })),
     runs: records,
+    rounds,
   })
 }
 
@@ -191,6 +194,77 @@ export async function pipelineCounts(owner: string): Promise<Partial<Record<Pipe
 /** Removes it with its runs and events. Spend rows stay (their run link is cleared), so the month's total does not shrink. */
 export async function deleteOpportunity(owner: string, oppId: string): Promise<boolean> {
   const rows = await (await getDb()).query('delete from opportunities where id = $1 and owner_id = $2 returning id', [oppId, owner])
+  return rows.length > 0
+}
+
+interface RoundRow {
+  id: string
+  kind: Round['kind']
+  at: Date | null
+  format: Round['format']
+  interviewers: string[]
+  notes: string
+  outcome: Round['outcome']
+  created_at: Date
+}
+const ROUND_COLUMNS = 'id, kind, at, format, interviewers, notes, outcome, created_at'
+const toRound = (r: RoundRow): Round => Round.parse({ ...r, at: r.at ? iso(r.at) : null, created_at: iso(r.created_at) })
+
+// The settable columns, in a fixed order; interviewers is a JSON array.
+const ROUND_FIELDS = ['kind', 'at', 'format', 'interviewers', 'notes', 'outcome'] as const
+const roundValue = (k: (typeof ROUND_FIELDS)[number], v: unknown) => (k === 'interviewers' ? JSON.stringify(v) : v)
+const roundCast = (k: (typeof ROUND_FIELDS)[number]) => (k === 'interviewers' ? '::jsonb' : '')
+
+/** Rounds in date order, unscheduled ones last. */
+export async function listRounds(owner: string, oppId: string): Promise<Round[]> {
+  const rows = await (await getDb()).query<RoundRow>(
+    `select ${ROUND_COLUMNS} from rounds where opportunity_id = $1 and owner_id = $2 order by at nulls last, created_at`,
+    [oppId, owner],
+  )
+  return rows.map(toRound)
+}
+
+export async function addRound(owner: string, oppId: string, input: RoundPatch & { kind: Round['kind'] }): Promise<Round> {
+  const valid = RoundPatch.required({ kind: true }).parse(input)
+  const db = await getDb()
+  const mine = await db.query('select 1 from opportunities where id = $1 and owner_id = $2', [oppId, owner])
+  if (!mine.length) throw new Error(`no opportunity ${oppId}`)
+  const keys = ROUND_FIELDS.filter((k) => valid[k] !== undefined)
+  const placeholders = keys.map((k, i) => `$${i + 4}${roundCast(k)}`)
+  const [row] = await db.query<RoundRow>(
+    `insert into rounds (id, opportunity_id, owner_id, ${keys.join(', ')}) values ($1, $2, $3, ${placeholders.join(', ')}) returning ${ROUND_COLUMNS}`,
+    [id(6), oppId, owner, ...keys.map((k) => roundValue(k, valid[k]))],
+  )
+  return toRound(row!) // non-null: an insert with returning yields its row
+}
+
+export async function updateRound(owner: string, roundId: string, patch: RoundPatch): Promise<Round> {
+  const valid = RoundPatch.parse(patch)
+  const keys = ROUND_FIELDS.filter((k) => valid[k] !== undefined)
+  const sets = keys.map((k, i) => `${k} = $${i + 3}${roundCast(k)}`)
+  const [row] = await (await getDb()).query<RoundRow>(
+    `update rounds set ${sets.join(', ') || 'id = id'} where id = $1 and owner_id = $2 returning ${ROUND_COLUMNS}`,
+    [roundId, owner, ...keys.map((k) => roundValue(k, valid[k]))],
+  )
+  if (!row) throw new Error(`no round ${roundId}`)
+  return toRound(row)
+}
+
+/** A round with the company and role it belongs to, for its calendar file. */
+export async function roundWithOpportunity(owner: string, roundId: string): Promise<{ round: Round; opportunity_id: string; company: string | null; role: string | null } | null> {
+  const [row] = await (await getDb()).query<RoundRow & { opportunity_id: string; company: string | null; role: string | null }>(
+    `select r.id, r.kind, r.at, r.format, r.interviewers, r.notes, r.outcome, r.created_at, r.opportunity_id, o.company, o.role
+       from rounds r join opportunities o on o.id = r.opportunity_id
+      where r.id = $1 and r.owner_id = $2`,
+    [roundId, owner],
+  )
+  if (!row) return null
+  const { opportunity_id, company, role, ...r } = row
+  return { round: toRound(r), opportunity_id, company, role }
+}
+
+export async function deleteRound(owner: string, roundId: string): Promise<boolean> {
+  const rows = await (await getDb()).query('delete from rounds where id = $1 and owner_id = $2 returning id', [roundId, owner])
   return rows.length > 0
 }
 

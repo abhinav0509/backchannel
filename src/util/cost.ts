@@ -1,4 +1,5 @@
-import { BUDGETS } from '../config'
+import { BUDGETS, ESTIMATE_USD } from '../config'
+import { isAdminOwner } from '../server/auth'
 import { getDb } from '../db/db'
 import type { StageName } from '../types/research'
 
@@ -51,7 +52,7 @@ export class Budget {
   constructor(
     private readonly limits: { searchesPerRun: number; tokensPerRun: number },
     private readonly month: { spentBefore: number; capUsd: number },
-    private readonly opts: { initial?: Spend; persist?: Persist } = {},
+    private readonly opts: { initial?: Spend; persist?: Persist; member?: { spentBefore: number; capUsd: number } } = {},
   ) {
     this.total = { ...(opts.initial ?? zeroSpend()) }
   }
@@ -63,6 +64,8 @@ export class Budget {
   assertCanSpend(): void {
     if (this.month.spentBefore + this.total.usd >= this.month.capUsd)
       throw new BudgetExceeded(`monthly cap of $${this.month.capUsd} reached`)
+    const m = this.opts.member
+    if (m && m.spentBefore + this.total.usd >= m.capUsd) throw new BudgetExceeded(`your monthly limit of $${m.capUsd} is reached`)
     if (totalTokens(this.total) >= this.limits.tokensPerRun)
       throw new BudgetExceeded(`run token cap of ${this.limits.tokensPerRun} reached`)
   }
@@ -94,12 +97,25 @@ const SPEND_COLUMNS = `coalesce(sum(input_tokens), 0)::int as input, coalesce(su
   coalesce(sum(cache_read_tokens), 0)::int as "cacheRead", coalesce(sum(cache_write_tokens), 0)::int as "cacheWrite",
   coalesce(sum(searches), 0)::int as searches, coalesce(sum(usd), 0)::float8 as usd`
 
-/** Spend recorded since the start of this calendar month (UTC), across every run and process. */
-export async function monthSpend(): Promise<number> {
+const MONTH = "at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'"
+
+/** Spend recorded since the start of this calendar month (UTC): everyone's, or one person's. */
+export async function monthSpend(owner?: string): Promise<number> {
   const [row] = await (await getDb()).query<{ usd: number }>(
-    "select coalesce(sum(usd), 0)::float8 as usd from spend where at >= date_trunc('month', now() at time zone 'utc') at time zone 'utc'",
+    `select coalesce(sum(usd), 0)::float8 as usd from spend where ${MONTH}${owner ? ' and owner_id = $1' : ''}`,
+    owner ? [owner] : [],
   )
   return row?.usd ?? 0
+}
+
+/** What someone can still spend this month, under their own limit and the overall cap, and which runs fit. */
+export async function allowance(owner: string) {
+  const overall = await monthSpend()
+  const admin = isAdminOwner(owner)
+  const mine = admin ? overall : await monthSpend(owner)
+  const capUsd = admin ? BUDGETS.monthlyUsd : BUDGETS.memberMonthlyUsd
+  const remainingUsd = Math.max(0, Math.min(BUDGETS.monthlyUsd - overall, capUsd - mine))
+  return { capUsd, spentUsd: mine, remainingUsd, fits: { triage: remainingUsd >= ESTIMATE_USD.triage, deep: remainingUsd >= ESTIMATE_USD.deep } }
 }
 
 /** One run's totals and per-stage breakdown. */
@@ -113,17 +129,46 @@ export async function runSpend(runId: string): Promise<Spend & { stages: Partial
 /** A budget for a run (or for one durable step of it), seeded with what the month and the run have already spent. */
 export async function runBudget(mode: 'triage' | 'deep', runId: string | null): Promise<Budget> {
   const db = await getDb()
-  const [month, initial] = await Promise.all([monthSpend(), runId ? runSpend(runId) : Promise.resolve(zeroSpend())])
+  const [run] = runId ? await db.query<{ owner_id: string }>('select owner_id from runs where id = $1', [runId]) : []
+  const owner = run?.owner_id ?? null
+  const member = owner !== null && !isAdminOwner(owner)
+  const [month, mine, initial] = await Promise.all([
+    monthSpend(),
+    member ? monthSpend(owner) : Promise.resolve(0),
+    runId ? runSpend(runId) : Promise.resolve(zeroSpend()),
+  ])
   return new Budget(
     BUDGETS[mode],
     { spentBefore: month - initial.usd, capUsd: BUDGETS.monthlyUsd },
     {
       initial: { input: initial.input, output: initial.output, cacheRead: initial.cacheRead, cacheWrite: initial.cacheWrite, searches: initial.searches, usd: initial.usd },
+      ...(member && { member: { spentBefore: mine - initial.usd, capUsd: BUDGETS.memberMonthlyUsd } }),
       persist: async (stage, model, u, usd) => {
         await db.query(
-          `insert into spend (run_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-          [runId, stage, model, u.input, u.output, u.cacheRead, u.cacheWrite, u.searches, usd],
+          `insert into spend (run_id, owner_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd)
+           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [runId, owner, stage, model, u.input, u.output, u.cacheRead, u.cacheWrite, u.searches, usd],
+        )
+      },
+    },
+  )
+}
+
+/** A small budget for one-off work that belongs to a person but not to a research run, such as reading a CV. */
+export async function ownerBudget(owner: string): Promise<Budget> {
+  const db = await getDb()
+  const member = !isAdminOwner(owner)
+  const [month, mine] = await Promise.all([monthSpend(), member ? monthSpend(owner) : Promise.resolve(0)])
+  return new Budget(
+    { searchesPerRun: 0, tokensPerRun: 200_000 },
+    { spentBefore: month, capUsd: BUDGETS.monthlyUsd },
+    {
+      ...(member && { member: { spentBefore: mine, capUsd: BUDGETS.memberMonthlyUsd } }),
+      persist: async (stage, model, u, usd) => {
+        await db.query(
+          `insert into spend (run_id, owner_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd)
+           values (null, $1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [owner, stage, model, u.input, u.output, u.cacheRead, u.cacheWrite, u.searches, usd],
         )
       },
     },

@@ -69,12 +69,12 @@ function LoginForm() {
           </label>
           <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
           <button className="btn btn-primary mt-5 w-full justify-center" disabled={busy || !email}>
-            {busy ? 'Sending…' : 'Email me a sign-in link'}
+            {busy ? 'Sending…' : 'Email me a sign-in code'}
           </button>
         </form>
       ) : (
         <form onSubmit={verify} className="mt-6">
-          <p className="t-small text-ink-2">Check {email}. Open the sign-in link on this device and in this browser. If your email shows a code instead, type it here.</p>
+          <p className="t-small text-ink-2">We sent a 6-digit code to {email}. Type it here, or open the link in the same email.</p>
           <label htmlFor="code" className="mt-5 block t-small text-ink-2">
             Code
           </label>

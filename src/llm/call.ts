@@ -35,12 +35,17 @@ export async function callStructured<S extends z.ZodType>(o: {
   // false for mechanical conversions: thinking tokens count against max_tokens, and on large
   // extractions they used it all up and cut the JSON off. Only on models that accept it (Haiku 5.5).
   thinking?: false
+  document?: { base64: string; mediaType: 'application/pdf' } // read alongside the prompt, e.g. a CV
 }): Promise<{ data: z.output<S>; dropped: string[] }> {
   const constrained = o.constrained ?? true
   const prompt = constrained
     ? o.prompt
     : `${o.prompt}\n\nReturn only JSON matching this JSON Schema, with no prose:\n${JSON.stringify(z.toJSONSchema(o.schema, { io: 'input' }))}`
-  let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: prompt }]
+  const withDocument = (text: string): Anthropic.Beta.BetaMessageContentParam =>
+    o.document
+      ? [{ type: 'document', source: { type: 'base64', media_type: o.document.mediaType, data: o.document.base64 } }, { type: 'text', text }]
+      : text
+  let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: withDocument(prompt) }]
   let issues = ''
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     const { content, truncated } = await send(
@@ -66,7 +71,7 @@ export async function callStructured<S extends z.ZodType>(o: {
         {
           role: 'user',
           // The attempt number keeps each retry distinct: an identical request would be served the cut-off answer from cache.
-          content: `${prompt}\n\nA previous answer (attempt ${attempt + 1}) was too long and was cut off. Keep only the most important items in each list, and give each claim one evidence entry.`,
+          content: withDocument(`${prompt}\n\nA previous answer (attempt ${attempt + 1}) was too long and was cut off. Keep only the most important items in each list, and give each claim one evidence entry.`),
         },
       ]
       continue

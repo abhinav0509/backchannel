@@ -14,6 +14,12 @@ Your pipeline stage (`src/types/tracking.ts`: New to Closed, with a reason when 
 notes, next step and prep answers are edited by hand and live on the opportunity row, apart from
 research. Deep runs: business, money, people, market, contacts and press stages in parallel, then synthesis.
 
+People: the admin (ALLOWED_EMAILS, user id BACKCHANNEL_OWNER) invites others from /people. An
+invitee is let in by `app_metadata.backchannel_role = 'member'`, set with the secret key, never by
+user-editable metadata. Spend is recorded per owner: invitees have their own monthly cap
+(`BUDGETS.memberMonthlyUsd`) inside the overall one, checked before a run starts and on every call.
+A CV is read once into a profile draft (`src/profile/import.ts`) and never stored.
+
 ## Principles that override convenience
 
 1. **Evidence or it is dropped.** Every factual claim carries at least one source URL with a

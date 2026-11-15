@@ -132,6 +132,7 @@ export function assembleReport(draft: Draft, synth: StageResult<SynthOut>, total
     questions_to_ask: (s?.questions ?? []).map((q) => q.question),
     questions: s?.questions ?? [],
     outlook: s?.outlook ?? null,
+    fit: s?.fit ?? null,
     verdict: s?.verdict ?? 'Synthesis did not complete, so there are no flags, scores or verdict. The sourced research below is still valid.',
     // Synthesis gaps are the curated, decision-relevant ones; stage notes and dropped claims follow.
     gaps: unique([...(s?.gaps ?? []), ...draft.gaps, ...(s ? synth.dropped : stageGaps('synthesize', synth))]),

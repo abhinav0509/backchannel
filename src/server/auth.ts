@@ -20,11 +20,25 @@ export function authMode(env: Env = process.env): 'supabase' | 'local' | 'open' 
 /** Who owns research while sign-in is off: your Supabase user id, so it is yours once sign-in returns. */
 export const openOwner = (env: Env = process.env) => (env.BACKCHANNEL_OWNER && UUID.test(env.BACKCHANNEL_OWNER) ? env.BACKCHANNEL_OWNER : LOCAL_OWNER)
 
-export function ownerFromClaims(claims: { sub?: string; email?: string } | null | undefined, allowedEmails: string): string | null {
+export type Role = 'admin' | 'member'
+
+type Claims = { sub?: string; email?: string; app_metadata?: { backchannel_role?: unknown } }
+
+/**
+ * Who a signed-in session is. Admins are the emails in ALLOWED_EMAILS. Members are people an
+ * admin invited: the invite tags app_metadata with the secret key, which a user cannot set, so a
+ * stranger who signs up anyway is still refused.
+ */
+export function ownerFromClaims(claims: Claims | null | undefined, adminEmails: string): { id: string; role: Role } | null {
   if (!claims?.sub || !claims.email) return null
-  const allowed = allowedEmails.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
-  return allowed.includes(claims.email.toLowerCase()) ? claims.sub : null
+  const admins = adminEmails.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  if (admins.includes(claims.email.toLowerCase())) return { id: claims.sub, role: 'admin' }
+  if (claims.app_metadata?.backchannel_role === 'member') return { id: claims.sub, role: 'member' }
+  return null
 }
+
+/** The admin's own research is limited only by the overall cap; everyone else by their own as well. */
+export const isAdminOwner = (owner: string, env: Env = process.env) => owner === openOwner(env)
 
 const SIGN_IN = ['NEXT_PUBLIC_SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'ALLOWED_EMAILS'] as const
 

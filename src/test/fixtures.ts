@@ -18,7 +18,7 @@ export function validReport(o: { name?: string; domain?: string } = {}): Company
     people: { headcount: null, headcount_trend: null, layoff_events: [], leadership_changes: [], review_scores: [] },
     role: { title: 'Product Designer', level_claimed: 'Lead', location: 'Remote', work_policy: 'remote', employment_type: 'permanent', required_years: null, extracted_requirements: [] },
     business: null, market: null, contacts: null, press: null,
-    flags: [], scores: [], questions_to_ask: [], questions: [], verdict: 'Placeholder verdict.', outlook: null, gaps: [],
+    flags: [], scores: [], questions_to_ask: [], questions: [], verdict: 'Placeholder verdict.', outlook: null, fit: null, gaps: [],
     run: { mode: 'deep', searches_used: 10, input_tokens: 100, output_tokens: 10, cost_usd: 1, duration_ms: 1000, stage_status: { parse: 'ok' } },
   }
 }

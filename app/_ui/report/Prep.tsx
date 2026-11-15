@@ -78,7 +78,21 @@ function Item({ q, entry, onChange }: { q: Question; entry: PrepEntry | undefine
  * Interview prep from what research found and could not find. Tick a question off as you ask
  * it and note the answer; answers are kept by question, so a re-run keeps the ones it repeats.
  */
-export function Prep({ id, questions, gaps, initial, onChange }: { id: string; questions: Question[]; gaps: string[]; initial: Record<string, PrepEntry>; onChange?: (prep: Record<string, PrepEntry>) => void }) {
+export function Prep({
+  id,
+  questions,
+  gaps,
+  initial,
+  onChange,
+  talkingPoints = [],
+}: {
+  id: string
+  questions: Question[]
+  gaps: string[]
+  initial: Record<string, PrepEntry>
+  onChange?: (prep: Record<string, PrepEntry>) => void
+  talkingPoints?: string[]
+}) {
   const [prep, setPrep] = useState(initial)
   const { state, save } = useAutosave(id)
   const [copied, setCopied] = useState(false)
@@ -131,6 +145,21 @@ export function Prep({ id, questions, gaps, initial, onChange }: { id: string; q
           </button>
         </div>
       </header>
+
+      {talkingPoints.length > 0 && (
+        <section aria-labelledby="bring-up" className="rounded-[16px] border-l-[3px] border-accent bg-accent-soft/50 py-4 pr-5 pl-5">
+          <h2 id="bring-up" className="t-small font-semibold text-accent">
+            Bring up from your own work
+          </h2>
+          <ul className="mt-2 space-y-1.5">
+            {talkingPoints.map((t) => (
+              <li key={t} className="t-small text-ink">
+                {t}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {ORDER.map((t) => {
         const qs = questions.filter((q) => q.topic === t)

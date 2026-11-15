@@ -142,7 +142,27 @@ ${claims(mkt.headwinds, String)}
 
 ${r.verdict || 'Not available.'}
 
-## Scores
+${
+  r.fit
+    ? `## How you fit
+
+${r.fit.summary}
+
+### Strengths
+
+${list(r.fit.strengths)}
+
+### Gaps
+
+${list(r.fit.gaps)}
+
+### Talking points
+
+${list(r.fit.talking_points)}
+
+`
+    : ''
+}## Scores
 
 | Dimension | Score | Why |
 |---|---|---|

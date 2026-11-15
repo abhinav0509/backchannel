@@ -7,6 +7,10 @@ layoffs and employee sentiment, where it stands on AI and where it is heading, w
 about it next to what it says about itself (newsroom, design and engineering blogs), every fact
 linked to the source behind it. Then six scores, risks, and interview questions you can tick off as you ask them.
 
+Invite friends and family: each starts by adding their CV, which becomes their profile, so every
+report also says how the role fits them. Log interview rounds with a calendar invite and the
+questions to ask in each.
+
 Track each one through your search: New, Interested, Screening, Interviewing, Offer, Back pocket,
 On hold, Passed or Closed (with the reason), with a next step, a date and notes.
 

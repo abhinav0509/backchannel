@@ -108,7 +108,7 @@ export const Score = z.object({
 })
 
 export const StageName = z.enum([
-  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'contacts', 'press', 'local', 'role', 'synthesize',
+  'parse', 'resolve', 'triage', 'business', 'money', 'people', 'market', 'contacts', 'press', 'local', 'role', 'synthesize', 'profile',
 ])
 
 export const Domain = z.string().regex(/^[a-z0-9][a-z0-9-]*(\.[a-z0-9-]+)+$/, 'bare lowercase domain, e.g. sonatype.com')
@@ -182,6 +182,14 @@ export const Contact = z.object({
   // confirmed: a source names this person with this company and a current title; possible: anything less.
   match: z.enum(['confirmed', 'possible']),
   why: z.string(), // why this person matters to the candidate
+})
+
+/** How the role and company match the candidate's profile. A judgement from their profile and the research. */
+export const Fit = z.object({
+  summary: z.string(),
+  strengths: z.array(z.string()).max(4), // where their experience meets what the role or company needs
+  gaps: z.array(z.string()).max(4), // what the role asks that their profile does not show
+  talking_points: z.array(z.string()).max(4), // their own projects worth raising, tied to what the company is doing
 })
 
 /**
@@ -261,6 +269,7 @@ export const CompanyResearch = z.object({
   questions: z.array(Question).max(12).default([]),
   verdict: z.string(),
   outlook: z.string().nullable().default(null), // synthesis's read on where the company is heading, labelled as a read
+  fit: Fit.nullable().default(null), // null without a profile
   gaps: z.array(z.string()),
   run: Run,
 })
@@ -293,6 +302,7 @@ export type Market = z.infer<typeof Market>
 export type Question = z.infer<typeof Question>
 export type Contact = z.infer<typeof Contact>
 export type Press = z.infer<typeof Press>
+export type Fit = z.infer<typeof Fit>
 export type PressItem = z.infer<typeof PressItem>
 export type ContactRelation = z.infer<typeof ContactRelation>
 export type QuestionTopic = z.infer<typeof QuestionTopic>

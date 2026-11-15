@@ -51,6 +51,15 @@ describe('callStructured', () => {
     expect(send.mock.calls[1]?.[0]).not.toHaveProperty('thinking')
   })
 
+  it('sends a PDF ahead of the prompt when given one, and keeps it on retries', async () => {
+    send.mockResolvedValueOnce(text('{"year":12}')).mockResolvedValueOnce(text('{"year":2012}'))
+    await callStructured({ ...opts(), document: { base64: 'JVBERi0=', mediaType: 'application/pdf' } })
+    const first = send.mock.calls[0]?.[0].messages[0].content
+    expect(first[0]).toEqual({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: 'JVBERi0=' } })
+    expect(first[1]).toEqual({ type: 'text', text: 'p' })
+    expect(send.mock.calls[1]?.[0].messages[0].content[0].type).toBe('document')
+  })
+
   it('gives up after two retries instead of retrying forever', async () => {
     send.mockResolvedValue(text('{"year":12}'))
     await expect(callStructured(opts())).rejects.toBeInstanceOf(ValidationFailed)

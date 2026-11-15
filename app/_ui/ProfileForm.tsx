@@ -29,7 +29,19 @@ function Field({ id, label, hint, children }: { id: string; label: string; hint?
 }
 
 /** The candidate profile research is judged against, plus how much each score matters to you. */
-export function ProfileForm({ initial }: { initial: Profile | null }) {
+export function ProfileForm({
+  initial,
+  title = 'Your profile',
+  intro = 'Role fit, career signal and how-you-fit are judged against this. Without it, they stay unknown.',
+  onSaved,
+  header,
+}: {
+  initial: Profile | null
+  title?: string
+  intro?: string
+  onSaved?: () => void
+  header?: React.ReactNode
+}) {
   const p = initial
   const [headline, setHeadline] = useState(p?.headline ?? '')
   const [years, setYears] = useState(String(p?.years_experience ?? ''))
@@ -66,12 +78,14 @@ export function ProfileForm({ initial }: { initial: Profile | null }) {
     })
     const body = (await res.json().catch(() => ({}))) as { error?: string }
     setState(res.ok ? 'saved' : { error: body.error ?? 'Could not save.' })
+    if (res.ok) onSaved?.()
   }
 
   return (
     <form onSubmit={save} className="max-w-[760px] pt-8 lg:pt-10">
-      <h1 className="t-display">Your profile</h1>
-      <p className="mt-2 max-w-[52ch] text-ink-2">Role fit and career signal are judged against this. Without it, those two scores stay unknown.</p>
+      {header}
+      <h1 className="t-display">{title}</h1>
+      <p className="mt-2 max-w-[52ch] text-ink-2">{intro}</p>
 
       <div className="card mt-8 divide-y divide-line-soft px-5">
         <Field id="headline" label="Headline" hint="One line on what you do.">

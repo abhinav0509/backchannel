@@ -3,7 +3,7 @@ import { MODELS } from '../config'
 import { collectEvidenceUrls } from '../llm/evidence'
 import { callStructured } from '../llm/call'
 import type { Profile } from '../types/profile'
-import { Flag, Question, QuestionTopic, Score, ScoreDimension, type CompanyResearch } from '../types/research'
+import { Fit, Flag, Question, QuestionTopic, Score, ScoreDimension, type CompanyResearch } from '../types/research'
 import type { Budget } from '../util/cost'
 import { today } from './shared'
 
@@ -16,11 +16,12 @@ export const SynthOut = z.object({
   questions: z.array(Question).min(6).max(12),
   verdict: z.string().min(1),
   outlook: z.string().min(1),
+  fit: Fit.nullable(),
   gaps: z.array(z.string()),
 })
 export type SynthOut = z.infer<typeof SynthOut>
 
-export type Draft = Omit<CompanyResearch, 'flags' | 'scores' | 'questions_to_ask' | 'questions' | 'verdict' | 'outlook'>
+export type Draft = Omit<CompanyResearch, 'flags' | 'scores' | 'questions_to_ask' | 'questions' | 'verdict' | 'outlook' | 'fit'>
 
 export const synthSystem = `You turn sourced company research into a decision aid for one candidate deciding whether to interview. Today is ${today()}.
 You are direct. You state the main risk plainly. You never add facts that are not in the research, and you never present an inference as a fact.`
@@ -36,6 +37,7 @@ export const synthTask = `From the research below, produce:
 - questions: 6 to 12 questions for the candidate to ask in interviews, each specific to something found or to a gap. No generic questions. For each: why, one sentence naming the finding or gap that makes it worth asking; topic, one of ${QuestionTopic.options.join(', ')}. Cover the role and team, not only the company.
 - verdict: 3 to 5 sentences. Lead with the main risk, stated plainly.
 - outlook: 2 to 4 sentences on where the company looks to be heading, drawn only from the research (strategy, news, press coverage, money, AI, headwinds). It is read as your judgement, so reason from the findings and do not introduce new facts.
+- fit: null when there is no candidate profile. Otherwise how this role and company match the candidate, written to them: summary (2 sentences, plain about the main mismatch if there is one); strengths, where their experience meets what the role or company needs; gaps, what the role asks that their profile does not show; talking_points, their own projects or experience worth raising, each tied to something the company is doing. Name their actual projects and skills from the profile; never invent experience. Up to 4 of each.
 - gaps: what could not be established and why it matters for this decision.`
 
 export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK

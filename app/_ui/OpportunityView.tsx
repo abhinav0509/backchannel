@@ -16,6 +16,7 @@ import { Progress } from './Progress'
 import { Brief } from './report/Brief'
 import { Prep } from './report/Prep'
 import { AiTab, CompanyTab, MoneyTab, OutlookTab, PeopleTab, PressTab } from './report/tabs'
+import { Rounds } from './report/Rounds'
 import { Tracker } from './report/Tracker'
 import { RunView } from './RunView'
 import { StagePicker } from './StagePicker'
@@ -104,7 +105,7 @@ function TabBar({ tabs, value, onChange, badge }: { tabs: readonly Tab[]; value:
   )
 }
 
-export function OpportunityView({ initial, realtime, tab: initialTab }: { initial: Opportunity; realtime: boolean; tab: Tab | null }) {
+export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile }: { initial: Opportunity; realtime: boolean; tab: Tab | null; hasProfile: boolean }) {
   const router = useRouter()
   const [o, setO] = useLive(initial, realtime)
   const [startError, setStartError] = useState<string | null>(null)
@@ -157,6 +158,10 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
   }
 
   const deep = { onDeep: () => void start('deep'), running }
+  // Older reports only have the question text; they show without a why, under one topic.
+  const questions = r ? (r.questions.length ? r.questions : r.questions_to_ask.map((q) => ({ question: q, why: '', topic: 'company' as const }))) : []
+  // Names to suggest as interviewers: the people research found.
+  const people = [...new Set([...(r?.contacts ?? []).map((c) => c.value.name), ...(r?.business?.leaders ?? []).map((l) => l.value.name)])]
   const askedCount = r ? r.questions.filter((q) => o.prep[q.question]?.asked).length : 0
 
   return (
@@ -266,9 +271,10 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
             <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="fill-in pt-8">
               {tab === 'brief' && (
                 <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-w-0">{r ? <Brief r={r} /> : t && <TriageView t={t} running={running} onDeep={() => void start('deep')} />}</div>
-                  <aside className="xl:sticky xl:top-20 xl:self-start">
+                  <div className="min-w-0">{r ? <Brief r={r} hasProfile={hasProfile} onDeep={running ? undefined : () => void start('deep')} /> : t && <TriageView t={t} running={running} onDeep={() => void start('deep')} />}</div>
+                  <aside className="space-y-3 xl:sticky xl:top-20 xl:self-start">
                     <Tracker id={o.id} initial={{ notes: o.notes, next_step: o.next_step, next_step_at: o.next_step_at }} />
+                    <Rounds oppId={o.id} initial={o.rounds} questions={questions} prep={o.prep} people={people} />
                   </aside>
                 </div>
               )}
@@ -281,10 +287,11 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
               {r && tab === 'prep' && (
                 <Prep
                   id={o.id}
-                  questions={r.questions.length ? r.questions : r.questions_to_ask.map((q) => ({ question: q, why: '', topic: 'company' as const }))}
+                  questions={questions}
                   gaps={r.gaps}
                   initial={o.prep}
                   onChange={(prep) => setO((x) => ({ ...x, prep }))}
+                  talkingPoints={r.fit?.talking_points ?? []}
                 />
               )}
               {tab === 'sources' && <RunView o={o} />}
@@ -294,7 +301,10 @@ export function OpportunityView({ initial, realtime, tab: initialTab }: { initia
 
         {!tabs.length && !running && (
           <div className="mt-8">
-            <Tracker id={o.id} initial={{ notes: o.notes, next_step: o.next_step, next_step_at: o.next_step_at }} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <Tracker id={o.id} initial={{ notes: o.notes, next_step: o.next_step, next_step_at: o.next_step_at }} />
+              <Rounds oppId={o.id} initial={o.rounds} questions={questions} prep={o.prep} people={people} />
+            </div>
           </div>
         )}
 

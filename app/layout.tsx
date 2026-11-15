@@ -2,12 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import { Schibsted_Grotesk } from 'next/font/google'
 import Link from 'next/link'
 import { Suspense, type ReactNode } from 'react'
-import { BUDGETS } from '../src/config'
 import { authMode } from '../src/server/auth'
 import { pipelineCounts } from '../src/store/repo'
-import { monthSpend } from '../src/util/cost'
+import { allowance } from '../src/util/cost'
 import { usd } from './_lib/format'
-import { currentOwner } from './_lib/session'
+import { currentUser } from './_lib/session'
 import { Brand } from './_ui/Brand'
 import { Nav } from './_ui/Nav'
 import { NewResearch } from './_ui/NewResearch'
@@ -28,13 +27,13 @@ export const viewport: Viewport = {
 }
 export const dynamic = 'force-dynamic'
 
-function Spend({ spent }: { spent: number }) {
-  const cap = BUDGETS.monthlyUsd
+/** This month's research spend: everyone's against the overall cap for the admin, your own against your allowance otherwise. */
+function Spend({ spent, cap, admin }: { spent: number; cap: number; admin: boolean }) {
   const share = Math.min(1, spent / cap)
   return (
-    <div className="px-2.5" title="Research spend this month. New research stops at the cap.">
+    <div className="px-2.5" title={admin ? 'Everyone’s research spend this month. New research stops at the cap.' : 'Your research spend this month. It resets on the 1st.'}>
       <p className="t-micro text-ink-3">
-        <span className="font-semibold text-ink-2">{usd(spent)}</span> of {usd(cap)} research this month
+        <span className="font-semibold text-ink-2">{usd(spent)}</span> of {admin ? usd(cap) : `your ${usd(cap)}`} research this month
       </p>
       <span className="mt-2 block h-1 overflow-hidden rounded-full bg-sunken" aria-hidden>
         <span className="meter block h-full rounded-full" style={{ width: `${share * 100}%`, background: share > 0.85 ? 'var(--risk)' : 'var(--ink-3)' }} />
@@ -44,8 +43,10 @@ function Spend({ spent }: { spent: number }) {
 }
 
 export default async function RootLayout({ children }: { children: ReactNode }) {
-  const owner = await currentOwner().catch(() => null)
-  const [spent, counts] = owner ? await Promise.all([monthSpend(), pipelineCounts(owner)]) : [0, {}]
+  const user = await currentUser().catch(() => null)
+  const owner = user?.id ?? null
+  const admin = user?.role === 'admin'
+  const [left, counts] = owner ? await Promise.all([allowance(owner), pipelineCounts(owner)]) : [null, {}]
   return (
     <html lang="en" className={grotesk.variable}>
       <body className="min-h-dvh">
@@ -62,11 +63,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                 </Suspense>
               </div>
               <div className="space-y-3 border-t border-line-soft pt-4">
-                <Spend spent={spent} />
+                {left && <Spend spent={left.spentUsd} cap={left.capUsd} admin={admin} />}
                 <div className="flex items-center justify-between px-1">
-                  <Link href="/profile" className="btn btn-ghost btn-sm">
-                    Your profile
-                  </Link>
+                  <span className="flex items-center gap-0.5">
+                    <Link href="/profile" className="btn btn-ghost btn-sm">
+                      Your profile
+                    </Link>
+                    {admin && (
+                      <Link href="/people" className="btn btn-ghost btn-sm">
+                        People
+                      </Link>
+                    )}
+                  </span>
                   {authMode() === 'supabase' && <SignOut />}
                 </div>
               </div>

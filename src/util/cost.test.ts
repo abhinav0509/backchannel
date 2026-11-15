@@ -42,6 +42,60 @@ describe('Budget', () => {
   })
 })
 
+describe('per-person caps', () => {
+  const MEMBER = '00000000-0000-0000-0000-00000000000b'
+  const ADMIN = '00000000-0000-0000-0000-000000000001' // the local owner is the admin without BACKCHANNEL_OWNER
+  async function runFor(owner: string, id: string) {
+    const db = await useTestDb()
+    await db.query('insert into opportunities (id, owner_id, text) values ($1, $2, $3)', [`o-${id}`, owner, 't'])
+    await db.query("insert into runs (id, opportunity_id, owner_id, mode) values ($1, $2, $3, 'deep')", [id, `o-${id}`, owner])
+    return db
+  }
+  beforeEach(async () => {
+    await useTestDb()
+  })
+
+  it('records whose spend each charge is', async () => {
+    const db = await runFor(MEMBER, 'm1')
+    const b = await runBudget('deep', 'm1')
+    b.charge('money', 'claude-sonnet-5-5', u(1000, 0))
+    await b.flush()
+    expect(await db.query('select owner_id from spend')).toEqual([{ owner_id: MEMBER }])
+    expect(await monthSpend(MEMBER)).toBeGreaterThan(0)
+    expect(await monthSpend(ADMIN)).toBe(0)
+  })
+
+  it('an invitee stops at their own monthly cap, while the overall cap still has room', async () => {
+    await runFor(MEMBER, 'm1')
+    const a = await runBudget('deep', 'm1')
+    a.charge('synthesize', 'claude-opus-5-5', u(0, (BUDGETS.memberMonthlyUsd / 20) * 1_000_000))
+    await a.flush()
+    const next = await runBudget('deep', 'm1')
+    expect(() => next.assertCanSpend()).toThrow(/your monthly limit of \$5/)
+  })
+
+  it('the admin is held only to the overall cap', async () => {
+    await runFor(ADMIN, 'a1')
+    const a = await runBudget('deep', 'a1')
+    a.charge('synthesize', 'claude-opus-5-5', u(0, (BUDGETS.memberMonthlyUsd / 20) * 1_000_000))
+    await a.flush()
+    expect(() => a.assertCanSpend()).not.toThrow()
+  })
+
+  it('says how much someone can still spend this month, and whether a run of each kind fits', async () => {
+    const { allowance } = await import('./cost')
+    await runFor(MEMBER, 'm1')
+    const a = await runBudget('deep', 'm1')
+    a.charge('synthesize', 'claude-opus-5-5', u(0, 200_000)) // $4
+    await a.flush()
+    const left = await allowance(MEMBER)
+    expect(left.remainingUsd).toBeCloseTo(1)
+    expect(left.capUsd).toBe(BUDGETS.memberMonthlyUsd)
+    expect(left.fits).toEqual({ triage: true, deep: false })
+    expect((await allowance(ADMIN)).capUsd).toBe(BUDGETS.monthlyUsd)
+  })
+})
+
 describe('ledger', () => {
   beforeEach(async () => {
     await useTestDb()
@@ -72,7 +126,7 @@ describe('ledger', () => {
 
   it('the monthly cap holds across separate budgets', async () => {
     const a = await runBudget('deep', null)
-    a.charge('synthesize', 'claude-opus-5-5', u(0, 1_000_000)) // $20
+    a.charge('synthesize', 'claude-opus-5-5', u(0, (BUDGETS.monthlyUsd / 20) * 1_000_000)) // $20 per million output tokens
     await a.flush()
     const next = await runBudget('triage', null)
     expect(() => next.assertCanSpend()).toThrow(/monthly cap/)

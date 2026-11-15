@@ -5,7 +5,9 @@ import { toMarkdown, triageToMarkdown } from '../report/markdown'
 import * as repo from '../store/repo'
 import type { Opportunity } from '../store/repo'
 import { Domain, type Flag, type ScoreDimension, type StageName } from '../types/research'
-import { TrackingPatch, type Pipeline, type PipelineReason } from '../types/tracking'
+import { RoundPatch, TrackingPatch, type Pipeline, type PipelineReason, type Round } from '../types/tracking'
+import { roundIcs } from '../report/ics'
+import { allowance } from '../util/cost'
 import { slug } from '../util/slug'
 import { researchWorkflow, type Ctx } from '../workflows/research'
 
@@ -61,9 +63,16 @@ export interface Summary {
   pipeline_at: string
   next_step: string | null
   next_step_at: string | null
+  next_round: { kind: Round['kind']; at: string } | null
 }
 
 const firstSentence = (s: string) => s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s
+
+/** The earliest scheduled round still ahead (an hour's grace, so one in progress still shows). */
+function nextRound(rounds: Round[], now = Date.now()): Summary['next_round'] {
+  const r = rounds.filter((x) => x.at && x.outcome === 'pending' && Date.parse(x.at) > now - 3_600_000).sort((a, b) => a.at!.localeCompare(b.at!))[0] // non-null: filtered to scheduled rounds
+  return r?.at ? { kind: r.kind, at: r.at } : null
+}
 
 function summarise(o: Opportunity): Summary {
   const flags = o.report?.flags ?? o.triage?.flags ?? []
@@ -90,6 +99,7 @@ function summarise(o: Opportunity): Summary {
     pipeline_at: o.pipeline_at,
     next_step: o.next_step,
     next_step_at: o.next_step_at,
+    next_round: nextRound(o.rounds),
   }
 }
 
@@ -114,9 +124,19 @@ async function launch(owner: string, o: Opportunity, mode: 'triage' | 'deep', co
   }
 }
 
+/** Refuses up front a run that would stop half way for want of budget, saying what is left. */
+async function overBudget(owner: string, mode: 'triage' | 'deep'): Promise<Reply | null> {
+  const a = await allowance(owner)
+  if (a.fits[mode]) return null
+  const what = mode === 'deep' ? 'Full research needs about $2.20' : 'A quick check needs about $0.35'
+  return reply(402, { error: `${what}, and there is $${a.remainingUsd.toFixed(2)} left of your $${a.capUsd.toFixed(2)} this month. It resets on the 1st.` })
+}
+
 export async function create(owner: string, body: unknown): Promise<Reply> {
   const b = CreateBody.safeParse(body)
   if (!b.success) return invalid(b.error)
+  const refused = await overBudget(owner, b.data.mode)
+  if (refused) return refused
   if ('text' in b.data) {
     const o = await repo.createOpportunity(owner, b.data.text)
     return (await launch(owner, o, b.data.mode)) ?? reply(201, { id: o.id })
@@ -132,6 +152,8 @@ export async function run(owner: string, id: string, body: unknown): Promise<Rep
   const b = RunBody.safeParse(body)
   if (!b.success) return invalid(b.error)
   if (o.status === 'running') return reply(409, { error: 'Research is already running for this opportunity.' })
+  const refused = await overBudget(owner, b.data.mode)
+  if (refused) return refused
   return (await launch(owner, o, b.data.mode, b.data.companyDomain ?? o.domain ?? undefined)) ?? reply(202, { id })
 }
 
@@ -168,5 +190,42 @@ export async function saveProfile(owner: string, body: unknown): Promise<Reply> 
   } catch (e) {
     if (e instanceof z.ZodError) return invalid(e)
     throw e
+  }
+}
+
+const RoundCreate = RoundPatch.required({ kind: true })
+
+export async function addRound(owner: string, oppId: string, body: unknown): Promise<Reply> {
+  const b = RoundCreate.safeParse(body)
+  if (!b.success) return invalid(b.error)
+  if (!(await repo.getOpportunity(owner, oppId))) return notFound()
+  return reply(201, await repo.addRound(owner, oppId, b.data))
+}
+
+export async function patchRound(owner: string, roundId: string, body: unknown): Promise<Reply> {
+  const b = RoundPatch.safeParse(body)
+  if (!b.success) return invalid(b.error)
+  try {
+    return reply(200, await repo.updateRound(owner, roundId, b.data))
+  } catch (e) {
+    if (/no round/.test(message(e))) return reply(404, { error: 'No round with that id.' })
+    throw e
+  }
+}
+
+export async function removeRound(owner: string, roundId: string): Promise<Reply> {
+  return (await repo.deleteRound(owner, roundId)) ? reply(204, null) : reply(404, { error: 'No round with that id.' })
+}
+
+/** An .ics file for a scheduled round, linking back to its prep. */
+export async function roundCalendar(owner: string, roundId: string, origin: string): Promise<Reply & { filename?: string }> {
+  const found = await repo.roundWithOpportunity(owner, roundId)
+  if (!found) return reply(404, { error: 'No round with that id.' })
+  if (!found.round.at) return reply(409, { error: 'Schedule the round first.' })
+  const company = found.company ?? 'Interview'
+  return {
+    status: 200,
+    body: roundIcs(found.round, { company, role: found.role, url: `${origin}/o/${found.opportunity_id}?tab=prep` }),
+    filename: `${slug(company, found.round.kind)}.ics`,
   }
 }

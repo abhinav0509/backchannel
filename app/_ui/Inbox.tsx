@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import type { Summary } from '../../src/server/api'
 import { PIPELINE, PIPELINE_GROUPS, type Pipeline } from '../../src/types/pipeline'
+import { ROUND_LABEL } from '../../src/report/ics'
 import { stageLabel } from '../_lib/format'
 import { STAGE } from '../_lib/pipeline'
 import { Monogram } from './Monogram'
@@ -19,7 +20,20 @@ type View = 'list' | 'board'
 const shortDate = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 
 /** "Panel on Nov 20", flagged when it has passed: the one date that should pull you back in. */
-export function NextStep({ o, today, compact }: { o: Pick<Summary, 'next_step' | 'next_step_at'>; today: string; compact?: boolean }) {
+export function NextStep({ o, today, compact }: { o: Pick<Summary, 'next_step' | 'next_step_at' | 'next_round'>; today: string; compact?: boolean }) {
+  // A booked interview round outranks a hand-written next step that falls after it.
+  if (o.next_round && (!o.next_step_at || o.next_round.at.slice(0, 10) <= o.next_step_at)) {
+    const day = o.next_round.at.slice(0, 10)
+    return (
+      <span className={`inline-flex max-w-full items-center gap-1.5 t-micro ${day === today ? 'text-accent' : 'text-sky'}`}>
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" aria-hidden />
+        <span className="truncate" suppressHydrationWarning>
+          {compact ? '' : `${ROUND_LABEL[o.next_round.kind]}, `}
+          {day === today ? 'today' : new Date(o.next_round.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      </span>
+    )
+  }
   if (!o.next_step && !o.next_step_at) return null
   const overdue = !!o.next_step_at && o.next_step_at < today
   const isToday = o.next_step_at === today

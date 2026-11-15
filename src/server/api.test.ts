@@ -114,6 +114,25 @@ describe('get and list', () => {
   })
 })
 
+describe('spend limits', () => {
+  it('refuses research that would not fit an invitee’s remaining allowance, and says why', async () => {
+    const db = await useTestDb()
+    await db.query("insert into spend (owner_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd) values ($1, 'money', 'm', 0, 0, 0, 0, 0, 4.2)", [OTHER])
+    const deep = await api.create(OTHER, { text: 'x', mode: 'deep' })
+    expect(deep.status).toBe(402)
+    expect((deep.body as { error: string }).error).toMatch(/\$0\.80 left of your \$5\.00 this month/)
+    expect((await api.create(OTHER, { text: 'x', mode: 'triage' })).status).toBe(201)
+    expect(start).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies to running research again too', async () => {
+    const db = await useTestDb()
+    const o = await repo.createOpportunity(OTHER, 'x')
+    await db.query("insert into spend (owner_id, stage, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, searches, usd) values ($1, 'money', 'm', 0, 0, 0, 0, 0, 5)", [OTHER])
+    expect((await api.run(OTHER, o.id, { mode: 'triage' })).status).toBe(402)
+  })
+})
+
 describe('track and remove', () => {
   it('updates the stage and notes for the owner only, and validates the body', async () => {
     const o = await repo.createOpportunity(ME, 'x')
@@ -160,5 +179,41 @@ describe('profile', () => {
     expect((await api.saveProfile(ME, { headline: 'Designer', years_experience: 8 })).status).toBe(200)
     expect((await api.getProfile(ME)).body).toMatchObject({ headline: 'Designer' })
     expect((await api.saveProfile(ME, { headline: '', years_experience: -1 })).status).toBe(400)
+  })
+})
+
+describe('rounds', () => {
+  it('adds, updates and deletes rounds for the owner, validating input', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const add = await api.addRound(ME, o.id, { kind: 'recruiter_screen', at: '2026-12-01T09:00:00Z' })
+    expect(add.status).toBe(201)
+    const id = (add.body as { id: string }).id
+    expect((await api.addRound(OTHER, o.id, { kind: 'panel' })).status).toBe(404)
+    expect((await api.addRound(ME, o.id, { kind: 'tea' })).status).toBe(400)
+    expect((await api.patchRound(ME, id, { outcome: 'passed' })).status).toBe(200)
+    expect((await api.patchRound(OTHER, id, { outcome: 'rejected' })).status).toBe(404)
+    expect((await api.removeRound(OTHER, id)).status).toBe(404)
+    expect((await api.removeRound(ME, id)).status).toBe(204)
+  })
+
+  it('the inbox shows the next scheduled round that has not happened yet', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await api.addRound(ME, o.id, { kind: 'recruiter_screen', at: '2020-01-01T09:00:00Z' })
+    await api.addRound(ME, o.id, { kind: 'panel', at: '2099-01-02T09:00:00Z' })
+    await api.addRound(ME, o.id, { kind: 'hiring_manager', at: '2099-01-01T09:00:00Z' })
+    const [s] = (await api.list(ME)).body as Summary[]
+    expect(s!.next_round).toEqual({ kind: 'hiring_manager', at: '2099-01-01T09:00:00.000Z' })
+  })
+
+  it('makes a calendar file for a scheduled round only', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await repo.patchOpportunity(ME, o.id, { company: 'Example' })
+    const a = (await api.addRound(ME, o.id, { kind: 'panel', at: '2099-01-02T09:00:00Z' })).body as { id: string }
+    const b = (await api.addRound(ME, o.id, { kind: 'final' })).body as { id: string }
+    const ics = await api.roundCalendar(ME, a.id, 'https://app.example')
+    expect(ics.status).toBe(200)
+    expect(String(ics.body)).toContain('SUMMARY:Panel: Example')
+    expect((await api.roundCalendar(ME, b.id, 'https://app.example')).status).toBe(409)
+    expect((await api.roundCalendar(OTHER, a.id, 'https://app.example')).status).toBe(404)
   })
 })

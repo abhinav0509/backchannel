@@ -47,7 +47,7 @@ describe('stage output schemas', () => {
   const score = (dimension: string) => ({ dimension, value: 50, rationale: 'r', evidence_urls: [], unknown: false })
   const six = ['role_fit', 'company_health', 'job_security', 'career_signal', 'culture', 'comp_confidence'].map(score)
   const q = (n: number) => Array.from({ length: n }, (_, i) => ({ question: `q${i}`, why: 'w', topic: 'role' }))
-  const synth = (o: object = {}) => ({ flags: [], scores: six, questions: q(6), verdict: 'v', outlook: 'o', gaps: [], ...o })
+  const synth = (o: object = {}) => ({ flags: [], scores: six, questions: q(6), verdict: 'v', outlook: 'o', fit: null, gaps: [], ...o })
 
   it('synthesis needs all six scores exactly once and 6 to 12 questions, each with why and topic', () => {
     expect(SynthOut.safeParse(synth()).success).toBe(true)
@@ -56,6 +56,12 @@ describe('stage output schemas', () => {
     expect(SynthOut.safeParse(synth({ questions: q(5) })).success).toBe(false)
     expect(SynthOut.safeParse(synth({ questions: q(13) })).success).toBe(false)
     expect(SynthOut.safeParse(synth({ questions: [{ question: 'x', topic: 'role' }, ...q(5)] })).success).toBe(false)
+  })
+
+  it('fit is null without a profile, and otherwise at most four of each part', () => {
+    const fit = { summary: 's', strengths: ['a'], gaps: [], talking_points: ['t'] }
+    expect(SynthOut.safeParse(synth({ fit })).success).toBe(true)
+    expect(SynthOut.safeParse(synth({ fit: { ...fit, strengths: ['1', '2', '3', '4', '5'] } })).success).toBe(false)
   })
 
   it('business and market carry gaps, and the AI stance is a fixed scale', () => {
@@ -106,7 +112,7 @@ describe('synthPrompt', () => {
   it('leaves out run bookkeeping, so equal research gives an equal prompt (and a cache hit)', async () => {
     const { synthPrompt } = await import('./stage8-synthesize')
     const { validReport } = await import('../test/fixtures')
-    const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, ...draft } = validReport()
+    const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, fit: _fit, ...draft } = validReport()
     const a = synthPrompt(draft, null)
     const b = synthPrompt({ ...draft, generated_at: '2030-01-01T00:00:00.000Z', run: { ...draft.run, duration_ms: 99, cost_usd: 9 } }, null)
     expect(a).toBe(b)
@@ -118,12 +124,14 @@ describe('synthPrompt', () => {
 it('synthesis reads the business and market research, and labels the outlook as a read', async () => {
   const { synthPrompt, synthTask } = await import('./stage8-synthesize')
   const { validReport } = await import('../test/fixtures')
-  const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, ...draft } = validReport()
+  const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, fit: _fit, ...draft } = validReport()
   const p = synthPrompt({ ...draft, business: { summary: null, products: [], customers: null, business_model: null, competitors: [], founders: [], leaders: [] }, market: null }, null)
   expect(p).toContain('"business"')
   expect(p).toContain('"market"')
   expect(synthTask).toMatch(/outlook/i)
   expect(synthTask).toMatch(/why/i)
+  expect(synthTask).toMatch(/fit: null when there is no candidate profile/)
+  expect(synthTask).toMatch(/never invent experience/i)
 })
 
 it('business and market cap their lists, so extraction fits in one answer', async () => {
@@ -188,7 +196,7 @@ describe('press', () => {
 it('synthesis reads the press coverage too', async () => {
   const { synthPrompt } = await import('./stage8-synthesize')
   const { validReport } = await import('../test/fixtures')
-  const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, ...draft } = validReport()
+  const { flags: _f, scores: _s, questions_to_ask: _q, questions: _qs, verdict: _v, outlook: _o, fit: _fit, ...draft } = validReport()
   expect(synthPrompt({ ...draft, press: { coverage: [], own: [] } }, null)).toContain('"press"')
 })
 

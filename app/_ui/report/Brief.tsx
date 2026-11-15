@@ -71,8 +71,69 @@ function Why({ s }: { s: Score }) {
   )
 }
 
-/** The decision in one screen: the verdict, the six scores, and what argues each way. */
-export function Brief({ r }: { r: CompanyResearch }) {
+function FitList({ title, items, tone }: { title: string; items: string[]; tone: string }) {
+  if (!items.length) return null
+  return (
+    <div>
+      <p className="flex items-center gap-2 t-small font-semibold">
+        <span className="h-1.5 w-1.5 rounded-full" style={{ background: tone }} aria-hidden />
+        {title}
+      </p>
+      <ul className="mt-1.5 space-y-1.5">
+        {items.map((x) => (
+          <li key={x} className="t-small text-ink-2">
+            {x}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/** How this role fits the person reading it, from their profile. Or what it takes to see that. */
+function HowYouFit({ r, hasProfile, onDeep }: { r: CompanyResearch; hasProfile: boolean; onDeep?: () => void }) {
+  if (!r.fit)
+    return (
+      <section aria-label="How you fit" className="card flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="max-w-[48ch]">
+          <p className="font-semibold">See how this role fits you</p>
+          <p className="mt-1 t-small text-ink-2">
+            {hasProfile
+              ? 'Your profile was added after this research. Research again to see your strengths, gaps and talking points for this role.'
+              : 'Add your CV and Backchannel matches this role against your experience: your strengths, your gaps, and which of your projects to bring up.'}
+          </p>
+        </div>
+        {hasProfile ? (
+          onDeep && (
+            <button className="btn btn-quiet" onClick={onDeep}>
+              Research again
+            </button>
+          )
+        ) : (
+          <a href="/welcome" className="btn btn-primary">
+            Add your CV
+          </a>
+        )}
+      </section>
+    )
+  return (
+    <section aria-labelledby="fit" className="card p-5 sm:p-6">
+      <h2 id="fit" className="t-small font-semibold text-accent">
+        How you fit
+      </h2>
+      <p className="mt-2 max-w-[62ch] text-ink">{r.fit.summary}</p>
+      <div className="mt-5 grid gap-5 sm:grid-cols-3">
+        <FitList title="Your strengths here" items={r.fit.strengths} tone="var(--green)" />
+        <FitList title="Gaps to address" items={r.fit.gaps} tone="var(--amber)" />
+        <FitList title="Bring up" items={r.fit.talking_points} tone="var(--accent)" />
+      </div>
+      <p className="mt-4 t-micro text-ink-3">A judgement from your profile and this research. Update your profile and research again if it has changed.</p>
+    </section>
+  )
+}
+
+/** The decision in one screen: the verdict, how it fits you, the six scores, and what argues each way. */
+export function Brief({ r, hasProfile, onDeep }: { r: CompanyResearch; hasProfile: boolean; onDeep?: () => void }) {
   const risks = r.flags.filter((f) => f.polarity === 'risk').sort((a, b) => b.severity - a.severity)
   const greens = r.flags.filter((f) => f.polarity === 'green').sort((a, b) => b.severity - a.severity)
   const scores = DIMENSION_ORDER.flatMap((d) => r.scores.find((s) => s.dimension === d) ?? [])
@@ -90,6 +151,8 @@ export function Brief({ r }: { r: CompanyResearch }) {
         <p className="t-lede max-w-[36ch] text-ink">{lead}</p>
         {rest && <p className="mt-4 max-w-[68ch] text-ink-2">{rest}</p>}
       </section>
+
+      <HowYouFit r={r} hasProfile={hasProfile} onDeep={onDeep} />
 
       {scores.length > 0 && (
         <section aria-labelledby="signal" className="card p-5 sm:p-6">
