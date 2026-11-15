@@ -10,7 +10,7 @@ import { Monogram } from '../Monogram'
 import { Claims, Fact, Facts, n, NotYet, Section, Timeline, urls, type C } from './kit'
 
 type R = CompanyResearch
-type Deep = { onDeep?: () => void; running: boolean }
+type Deep = { onDeep?: () => void; running: boolean; starting?: boolean }
 
 function Lede<T>({ c, empty }: { c: C<T> | null; empty: string }) {
   if (!c) return <p className="t-small text-ink-3">{empty}</p>

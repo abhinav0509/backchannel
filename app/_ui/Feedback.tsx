@@ -3,6 +3,7 @@
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { Popover } from './Popover'
+import { Button } from './Button'
 
 /** Tell the person running Backchannel what works and what does not, from wherever you are. */
 export function Feedback({ compact = false }: { compact?: boolean }) {
@@ -69,9 +70,9 @@ export function Feedback({ compact = false }: { compact?: boolean }) {
             />
             {typeof state === 'object' && <p className="mt-2 t-micro text-risk">{state.error}</p>}
             <div className="mt-2 flex justify-end">
-              <button className="btn btn-primary btn-sm" disabled={!message.trim() || state === 'sending'}>
-                {state === 'sending' ? 'Sending…' : 'Send'}
-              </button>
+              <Button className="btn-primary btn-sm" pending={state === 'sending'} pendingLabel="Sending" disabled={!message.trim()}>
+                Send
+              </Button>
             </div>
           </form>
         )

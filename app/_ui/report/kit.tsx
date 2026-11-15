@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from 'react'
 import type { EvidenceRef } from '../../../src/types/research'
+import { Button } from '../Button'
 import { Cites, Confidence } from '../Evidence'
 
 export type C<T> = { value: T; confidence: 'confirmed' | 'reported' | 'unverified'; evidence: EvidenceRef[]; as_of: string | null; note?: string | null }
@@ -94,15 +95,15 @@ export function Claims<T>({ items, children, empty }: { items: C<T>[]; children:
 }
 
 /** Shown on a tab whose research has not run: says what it would add and offers to run it. */
-export function NotYet({ what, onDeep, running }: { what: string; onDeep?: () => void; running: boolean }) {
+export function NotYet({ what, onDeep, running, starting = false }: { what: string; onDeep?: () => void; running: boolean; starting?: boolean }) {
   return (
     <div className="card mx-auto max-w-[560px] p-8 text-center">
       <p className="t-title">Not researched yet</p>
       <p className="mx-auto mt-2 max-w-[44ch] t-small text-ink-2">{what}</p>
       {onDeep && !running && (
-        <button className="btn btn-primary mt-5" onClick={onDeep}>
+        <Button className="btn-primary mt-5" pending={starting} pendingLabel="Starting" onClick={onDeep}>
           Run full research
-        </button>
+        </Button>
       )}
       {running && <p className="mt-4 t-small text-accent">Research is running. This fills in when it finishes.</p>}
     </div>

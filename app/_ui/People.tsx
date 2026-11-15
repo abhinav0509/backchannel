@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { Member } from '../../src/server/members'
 import { age, usd } from '../_lib/format'
 import { Monogram } from './Monogram'
+import { Button } from './Button'
 
 /** Invite friends and family, see who has started, what they have spent, and take access away. */
 export function People({ capUsd }: { capUsd: number }) {
@@ -58,9 +59,9 @@ export function People({ capUsd }: { capUsd: number }) {
           <span className="t-small font-medium">Email</span>
           <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="friend@example.com" className="field mt-1.5" />
         </label>
-        <button className="btn btn-primary h-[42px]" disabled={state === 'sending' || !email}>
-          {state === 'sending' ? 'Sending…' : 'Send invitation'}
-        </button>
+        <Button className="btn-primary h-[42px]" pending={state === 'sending'} pendingLabel="Sending" disabled={!email}>
+          Send invitation
+        </Button>
         <p className="t-small sm:col-span-3" aria-live="polite">
           {typeof state === 'object' && 'sent' in state && <span className="text-green">Invitation sent to {state.sent}.</span>}
           {typeof state === 'object' && 'error' in state && <span className="text-risk">{state.error}</span>}

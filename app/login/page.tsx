@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { supabaseBrowser } from '../_lib/supabase-browser'
+import { Button } from '../_ui/Button'
 
 /** Sign in with a one-time code sent by email. A code (not a link) works when the email is opened on another device. */
 export default function Login() {
@@ -51,8 +52,7 @@ function LoginForm() {
     router.refresh()
   }
 
-  const field =
-    'mt-1.5 block h-11 w-full rounded-xl border border-line bg-surface px-3.5 text-[17px] outline-none transition-[border-color,box-shadow] duration-150 focus:border-accent/60 focus:shadow-[0_0_0_4px_var(--accent-soft)]'
+  const field = 'field mt-1.5 h-11 text-[16px]'
 
   return (
     <section className="mx-auto max-w-sm pt-24">
@@ -68,9 +68,9 @@ function LoginForm() {
             Email
           </label>
           <input id="email" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} className={field} />
-          <button className="btn btn-primary mt-5 w-full justify-center" disabled={busy || !email}>
-            {busy ? 'Sending…' : 'Email me a sign-in code'}
-          </button>
+          <Button className="btn-primary mt-5 w-full" pending={busy} pendingLabel="Sending" disabled={!email}>
+            Email me a sign-in code
+          </Button>
         </form>
       ) : (
         <form onSubmit={verify} className="mt-6">
@@ -87,9 +87,9 @@ function LoginForm() {
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 10))}
             className={`${field} tracking-[0.3em] tabular-nums`}
           />
-          <button className="btn btn-primary mt-5 w-full justify-center" disabled={busy || code.length < 6}>
-            {busy ? 'Checking…' : 'Sign in'}
-          </button>
+          <Button className="btn-primary mt-5 w-full" pending={busy} pendingLabel="Checking" disabled={code.length < 6}>
+            Sign in
+          </Button>
           <button type="button" className="mt-3 t-small text-accent hover:underline" onClick={() => setSent(false)}>
             Use a different email
           </button>

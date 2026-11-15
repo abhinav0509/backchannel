@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Button } from './Button'
 import type { Profile } from '../../src/types/profile'
 import { DIMENSION_ORDER, dimensionLabel, parseList } from '../_lib/format'
 
@@ -157,9 +158,9 @@ export function ProfileForm({
       </section>
 
       <div className="mt-10 flex items-center gap-4">
-        <button className="btn btn-primary" disabled={state === 'saving' || !headline.trim() || years === ''}>
-          {state === 'saving' ? 'Saving…' : 'Save profile'}
-        </button>
+        <Button className="btn-primary" pending={state === 'saving'} pendingLabel="Saving" disabled={!headline.trim() || years === ''}>
+          Save profile
+        </Button>
         <span className="t-small" aria-live="polite">
           {state === 'saved' && <span className="text-green">Saved. New research uses it.</span>}
           {typeof state === 'object' && <span className="text-risk">{state.error}</span>}

@@ -10,6 +10,7 @@ import { stageLabel } from '../_lib/format'
 import { STAGE } from '../_lib/pipeline'
 import type { AgendaItem } from '../../src/server/agenda'
 import { Monogram } from './Monogram'
+import { Button } from './Button'
 import { UpNext } from './UpNext'
 import { NewResearch } from './NewResearch'
 import { MenuItem, Popover } from './Popover'
@@ -89,9 +90,12 @@ function ResearchLine({ o }: { o: Summary }) {
 function RowMenu({ o }: { o: Summary }) {
   const router = useRouter()
   const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   async function remove(close: () => void) {
+    setDeleting(true)
     const res = await fetch(`/api/opportunities/${o.id}`, { method: 'DELETE' }).catch(() => null)
+    setDeleting(false)
     if (!res?.ok) {
       setError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? 'Could not delete. Try again.')
       return
@@ -124,9 +128,9 @@ function RowMenu({ o }: { o: Summary }) {
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirming(false)}>
                 Keep
               </button>
-              <button type="button" className="btn btn-sm bg-risk text-white hover:opacity-90" onClick={() => void remove(close)}>
+              <Button type="button" className="btn-sm bg-risk text-white hover:opacity-90" pending={deleting} pendingLabel="Deleting" onClick={() => void remove(close)}>
                 Delete
-              </button>
+              </Button>
             </div>
           </div>
         ) : (

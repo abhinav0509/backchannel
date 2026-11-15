@@ -8,6 +8,7 @@ import { age, usd } from '../_lib/format'
 import { sourceIndex } from '../_lib/sources'
 import { TABS, type Tab } from '../_lib/tabs'
 import { supabaseBrowser } from '../_lib/supabase-browser'
+import { Button, Spinner } from './Button'
 import { Choice } from './Choice'
 import { SourcesContext } from './Evidence'
 import { Monogram } from './Monogram'
@@ -20,6 +21,7 @@ import { Rounds } from './report/Rounds'
 import { Tracker } from './report/Tracker'
 import { RunView } from './RunView'
 import { StagePicker } from './StagePicker'
+import { SkeletonLines } from './TaskProgress'
 import { TriageView } from './TriageView'
 
 const LABEL: Record<Tab, string> = {
@@ -110,6 +112,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
   const [o, setO] = useLive(initial, realtime)
   const [startError, setStartError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const r = o.report
   const t = o.triage
   const index = useMemo(() => sourceIndex(r ?? t), [r, t])
@@ -130,20 +133,29 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
     window.history.replaceState(null, '', url)
   }
 
+  // Which research is being started, so the button that started it can show it is working.
+  const [starting, setStarting] = useState<'triage' | 'deep' | null>(null)
+
   async function start(mode: 'triage' | 'deep', companyDomain?: string) {
+    if (starting) return
     setStartError(null)
-    const res = await fetch(`/api/opportunities/${o.id}/run`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(companyDomain ? { mode, companyDomain } : { mode }),
-    })
-    if (!res.ok) {
-      setStartError(((await res.json().catch(() => ({}))) as { error?: string }).error ?? 'Could not start the research.')
-      return
+    setStarting(mode)
+    try {
+      const res = await fetch(`/api/opportunities/${o.id}/run`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(companyDomain ? { mode, companyDomain } : { mode }),
+      }).catch(() => null)
+      if (!res?.ok) {
+        setStartError(((await res?.json().catch(() => ({}))) as { error?: string } | undefined)?.error ?? 'Could not start the research. Check your connection and try again.')
+        return
+      }
+      const fresh = await fetch(`/api/opportunities/${o.id}`, { cache: 'no-store' })
+      if (fresh.ok) setO((await fresh.json()) as Opportunity)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } finally {
+      setStarting(null)
     }
-    const fresh = await fetch(`/api/opportunities/${o.id}`, { cache: 'no-store' })
-    if (fresh.ok) setO((await fresh.json()) as Opportunity)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   /** Re-judges the report against your profile. Returns an error to show, or null when it worked. */
@@ -152,12 +164,15 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
     const body = (await res?.json().catch(() => null)) as (Opportunity & { error?: string }) | null
     if (!res?.ok || !body || body.error) return body?.error ?? 'The refresh did not complete. Try again in a moment.'
     setO(body)
+    router.refresh() // the sidebar's spend meter includes what this cost
     return null
   }
 
   async function remove(close: () => void) {
+    setDeleting(true)
     const res = await fetch(`/api/opportunities/${o.id}`, { method: 'DELETE' }).catch(() => null)
     if (!res?.ok) {
+      setDeleting(false)
       setStartError(((await res?.json().catch(() => null)) as { error?: string } | null)?.error ?? 'Could not delete. Try again.')
       close()
       return
@@ -166,7 +181,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
     router.refresh()
   }
 
-  const deep = { onDeep: () => void start('deep'), running }
+  const deep = { onDeep: () => void start('deep'), running, starting: starting === 'deep' }
   // Older reports only have the question text; they show without a why, under one topic.
   const questions = r ? (r.questions.length ? r.questions : r.questions_to_ask.map((q) => ({ question: q, why: '', topic: 'company' as const }))) : []
   // Names to suggest as interviewers: the people research found.
@@ -224,9 +239,9 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
                       <button type="button" className="btn btn-ghost btn-sm" onClick={() => setConfirmDelete(false)}>
                         Keep
                       </button>
-                      <button type="button" className="btn btn-sm bg-risk text-white hover:opacity-90" onClick={() => void remove(close)}>
+                      <Button type="button" className="btn-sm bg-risk text-white hover:opacity-90" pending={deleting} pendingLabel="Deleting" onClick={() => void remove(close)}>
                         Delete
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ) : (
@@ -253,7 +268,17 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
           </div>
         </header>
 
-        {startError && <p className="mt-6 rounded-[12px] bg-risk-soft px-4 py-3 t-small text-risk">{startError}</p>}
+        {startError && (
+          <p className="fill-in mt-6 rounded-[12px] bg-risk-soft px-4 py-3 t-small text-risk" role="alert">
+            {startError}
+          </p>
+        )}
+        {starting && !running && (
+          <p className="fill-in mt-6 flex items-center gap-2.5 rounded-[12px] bg-accent-soft px-4 py-3 t-small font-medium text-accent" role="status">
+            <Spinner />
+            Starting {starting === 'deep' ? 'full research' : 'a quick check'}
+          </p>
+        )}
 
         {(running || o.status === 'needs_choice' || o.status === 'failed') && (
           <div className="mt-8">
@@ -263,13 +288,16 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
               <div className="card mb-10 p-5">
                 <p className="font-semibold">Research stopped</p>
                 <p className="mt-1 t-small whitespace-pre-line text-ink-2">{o.error}</p>
-                <button className="btn btn-primary mt-4" onClick={() => void start(lastMode)}>
+                <Button className="btn-primary mt-4" pending={starting !== null} pendingLabel="Starting" onClick={() => void start(lastMode)}>
                   Try again
-                </button>
+                </Button>
               </div>
             )}
           </div>
         )}
+
+        {/* First research: show the shape of the report to come, rather than an empty page. */}
+        {running && !r && !t && <ReportPreview />}
 
         {tabs.length > 0 && (
           <>
@@ -280,7 +308,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
             <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="fill-in pt-8">
               {tab === 'brief' && (
                 <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-w-0">{r ? <Brief r={r} hasProfile={hasProfile} onRefit={running ? undefined : refit} /> : t && <TriageView t={t} running={running} onDeep={() => void start('deep')} />}</div>
+                  <div className="min-w-0">{r ? <Brief r={r} hasProfile={hasProfile} onRefit={running ? undefined : refit} /> : t && <TriageView t={t} running={running} starting={starting === 'deep'} onDeep={() => void start('deep')} />}</div>
                   <aside className="space-y-3 xl:sticky xl:top-20 xl:self-start">
                     <Tracker id={o.id} initial={{ notes: o.notes, next_step: o.next_step, next_step_at: o.next_step_at }} />
                     <Rounds oppId={o.id} initial={o.rounds} questions={questions} prep={o.prep} people={people} />
@@ -325,5 +353,48 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
         </details>
       </article>
     </SourcesContext.Provider>
+  )
+}
+
+/** The Brief's layout as placeholders, shown under the progress panel while a first research runs. */
+function ReportPreview() {
+  return (
+    <div className="mt-2 grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]" aria-hidden>
+      <div className="space-y-10">
+        <div className="space-y-3">
+          <span className="skeleton block h-6 w-4/5" />
+          <span className="skeleton block h-6 w-3/5" />
+          <span className="mt-4 block">
+            <SkeletonLines lines={3} />
+          </span>
+        </div>
+        <div className="card p-5">
+          <span className="skeleton block h-3 w-20" />
+          <div className="mt-5 grid grid-cols-6 gap-3">
+            {[60, 85, 40, 70, 55, 30].map((h, i) => (
+              <span key={i} className="flex h-24 flex-col justify-end rounded-[6px] bg-sunken">
+                <span className="skeleton block rounded-[6px]" style={{ height: `${h}%` }} />
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="card p-4">
+              <span className="skeleton block h-3 w-28" />
+              <span className="mt-3 block">
+                <SkeletonLines lines={3} widths={['90%', '75%', '50%']} />
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card hidden p-5 xl:block">
+        <span className="skeleton block h-3 w-20" />
+        <span className="mt-4 block">
+          <SkeletonLines lines={4} widths={['100%', '100%', '70%', '40%']} />
+        </span>
+      </div>
+    </div>
   )
 }

@@ -7,6 +7,7 @@ import { ROUND_LABEL } from '../../src/report/ics'
 import type { AgendaItem } from '../../src/server/agenda'
 import type { Round } from '../../src/types/tracking'
 import { Monogram } from './Monogram'
+import { Button } from './Button'
 
 const STALE_DAYS = 7
 
@@ -44,10 +45,11 @@ function Upcoming({ x }: { x: AgendaItem }) {
       </div>
       <div className="flex items-center gap-2">
         {stale && refresh !== 'started' && (
-          <button
+          <Button
             type="button"
-            className="btn btn-quiet btn-sm"
-            disabled={refresh === 'busy'}
+            className="btn-quiet btn-sm"
+            pending={refresh === 'busy'}
+            pendingLabel="Starting"
             onClick={async () => {
               setRefresh('busy')
               const res = await fetch(`/api/opportunities/${x.opportunity.id}/run`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'deep' }) }).catch(() => null)
@@ -57,8 +59,8 @@ function Upcoming({ x }: { x: AgendaItem }) {
               router.refresh()
             }}
           >
-            {refresh === 'busy' ? 'Starting…' : 'Refresh research, about $2.10'}
-          </button>
+            Refresh research, about $2.10
+          </Button>
         )}
         <Link href={`/o/${x.opportunity.id}?tab=prep`} className="btn btn-primary btn-sm">
           Prepare

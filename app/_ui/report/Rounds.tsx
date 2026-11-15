@@ -5,6 +5,7 @@ import { ROUND_LABEL } from '../../../src/report/ics'
 import type { Question } from '../../../src/types/research'
 import { ROUND_KINDS, type PrepEntry, type Round } from '../../../src/types/tracking'
 import { questionsForRound } from '../../_lib/rounds'
+import { Button } from '../Button'
 
 const OUTCOME: Record<Round['outcome'], { label: string; cls: string }> = {
   pending: { label: 'Upcoming', cls: 'bg-sky-soft text-sky' },
@@ -182,11 +183,14 @@ export function Rounds({ oppId, initial, questions, prep, people }: { oppId: str
   const [kind, setKind] = useState<Round['kind']>(initial.length ? 'hiring_manager' : 'recruiter_screen')
   const [at, setAt] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
   const sorted = [...rounds].sort((a, b) => (a.at ?? '9').localeCompare(b.at ?? '9'))
 
   async function add(e: React.FormEvent) {
     e.preventDefault()
+    setSaving(true)
     const res = await send(`/api/opportunities/${oppId}/rounds`, 'POST', { kind, ...(at && { at: new Date(at).toISOString() }) })
+    setSaving(false)
     if (!res) return setError('Could not add the round. Try again.')
     const r = (await res.json()) as Round
     setRounds((xs) => [...xs, r])
@@ -240,7 +244,9 @@ export function Rounds({ oppId, initial, questions, prep, people }: { oppId: str
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => setAdding(false)}>
               Cancel
             </button>
-            <button className="btn btn-primary btn-sm">Add round</button>
+            <Button className="btn-primary btn-sm" pending={saving} pendingLabel="Adding">
+              Add round
+            </Button>
           </div>
         </form>
       )}

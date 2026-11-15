@@ -5,6 +5,8 @@ import type { CompanyResearch, Flag, Score } from '../../../src/types/research'
 import { DIMENSION_ORDER, dimensionLabel, flagLabel, splitLead } from '../../_lib/format'
 import { Cites } from '../Evidence'
 import { Signal } from '../Signal'
+import { Button } from '../Button'
+import { SkeletonLines, TaskProgress } from '../TaskProgress'
 import { Changes } from './Changes'
 import { Gaps } from './kit'
 
@@ -91,51 +93,83 @@ function FitList({ title, items, tone }: { title: string; items: string[]; tone:
   )
 }
 
-/** How this role fits the person reading it, from their profile. Or what it takes to see that. */
-/** Re-judges this report against your profile, on the same research. Shows its own progress and errors. */
-function RefreshFit({ onRefit, label, quiet }: { onRefit: () => Promise<string | null>; label: string; quiet?: boolean }) {
-  const [state, setState] = useState<'idle' | 'busy' | { error: string }>('idle')
+const MATCH_STEPS = [
+  'Reading your profile',
+  'Weighing it against the research',
+  'Scoring role fit and career signal',
+  'Writing your strengths, gaps and talking points',
+  'Rewriting your interview questions',
+]
+
+/** The fit card's own layout in placeholder form, so the result lands where it was promised. */
+function FitPreview() {
   return (
-    <span className="inline-flex flex-col items-end gap-1">
-      <button
-        className={quiet ? 't-micro font-semibold text-accent hover:underline disabled:opacity-50' : 'btn btn-primary'}
-        disabled={state === 'busy'}
-        onClick={async () => {
-          setState('busy')
-          const error = await onRefit()
-          setState(error ? { error } : 'idle')
-        }}
-      >
-        {state === 'busy' ? 'Matching against your profile, one to two minutes…' : label}
-      </button>
-      {typeof state === 'object' && <span className="max-w-[40ch] text-right t-micro text-risk">{state.error}</span>}
-    </span>
+    <div>
+      <SkeletonLines lines={2} widths={['88%', '64%']} />
+      <div className="mt-5 grid gap-5 sm:grid-cols-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i}>
+            <span className="skeleton block h-3 w-24" />
+            <span className="mt-3 block">
+              <SkeletonLines lines={3} widths={['95%', '80%', '70%']} />
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
+/**
+ * How this role fits the person reading it, from their profile; or what it takes to see that.
+ * Matching takes a couple of minutes, so it shows its steps and a preview of the result in place.
+ */
 function HowYouFit({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfile: boolean; onRefit?: () => Promise<string | null> }) {
+  const [state, setState] = useState<'idle' | 'working' | { error: string }>('idle')
+  const match = async () => {
+    setState('working')
+    const error = await onRefit?.()
+    setState(error ? { error } : 'idle')
+  }
+
+  if (state === 'working')
+    return <TaskProgress title="Matching this role to your profile" steps={MATCH_STEPS} expectedSeconds={130} preview={<FitPreview />} />
+
+  const failed = typeof state === 'object' && (
+    <p className="mt-3 rounded-[10px] bg-risk-soft px-3 py-2 t-small text-risk" role="alert">
+      {state.error}
+    </p>
+  )
+
   if (!r.fit)
     return (
-      <section aria-label="How you fit" className="card flex flex-wrap items-center justify-between gap-4 p-5">
-        <div className="max-w-[48ch]">
-          <p className="font-semibold">See how this role fits you</p>
-          <p className="mt-1 t-small text-ink-2">
-            {hasProfile
-              ? 'Your profile came after this research. Match it now, on the same research: your strengths, gaps and talking points, and fresh scores. About $0.40.'
-              : 'Add your CV and Backchannel matches this role against your experience: your strengths, your gaps, and which of your projects to bring up.'}
-          </p>
+      <section aria-label="How you fit" className="card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="max-w-[48ch]">
+            <p className="font-semibold">See how this role fits you</p>
+            <p className="mt-1 t-small text-ink-2">
+              {hasProfile
+                ? 'Your profile came after this research. Match it now, on the same research: your strengths, gaps and talking points, and fresh scores. About $0.40 and two minutes.'
+                : 'Add your CV and Backchannel matches this role against your experience: your strengths, your gaps, and which of your projects to bring up.'}
+            </p>
+          </div>
+          {hasProfile ? (
+            onRefit && (
+              <Button className="btn-primary" onClick={() => void match()}>
+                {failed ? 'Try again' : 'Match my profile'}
+              </Button>
+            )
+          ) : (
+            <a href="/welcome" className="btn btn-primary">
+              Add your CV
+            </a>
+          )}
         </div>
-        {hasProfile ? (
-          onRefit && <RefreshFit onRefit={onRefit} label="Match my profile" />
-        ) : (
-          <a href="/welcome" className="btn btn-primary">
-            Add your CV
-          </a>
-        )}
+        {failed}
       </section>
     )
   return (
-    <section aria-labelledby="fit" className="card p-5 sm:p-6">
+    <section aria-labelledby="fit" className="card fill-in p-5 sm:p-6">
       <h2 id="fit" className="t-small font-semibold text-accent">
         How you fit
       </h2>
@@ -145,10 +179,15 @@ function HowYouFit({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfile:
         <FitList title="Gaps to address" items={r.fit.gaps} tone="var(--amber)" />
         <FitList title="Bring up" items={r.fit.talking_points} tone="var(--accent)" />
       </div>
-      <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-line-soft pt-4">
         <p className="t-micro text-ink-3">A judgement from your profile and this research.</p>
-        {onRefit && <RefreshFit onRefit={onRefit} label="Changed your profile? Refresh the match, about $0.40" quiet />}
+        {onRefit && (
+          <Button className="btn-ghost btn-sm" onClick={() => void match()}>
+            {failed ? 'Try again' : 'Refresh for my latest profile'}
+          </Button>
+        )}
       </div>
+      {failed}
     </section>
   )
 }

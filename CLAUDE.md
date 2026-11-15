@@ -80,6 +80,9 @@ profile (`src/server/refit.ts`) re-runs synthesis alone on a stored report. Func
 
 - Do not add dependencies without asking.
 - UI motion: ease-out, under 250ms, only in response to an action or to show progress. Respect reduced motion.
+- Anything that waits on the server shows it: `Button` with `pending` (keeps its width, spinner, short
+  label) for quick actions; `TaskProgress` (steps, bar, elapsed and usual time, a skeleton of the
+  result in place) for work over a few seconds. Never swap a label for a sentence or leave a blank.
 - Do not widen a type to make an error go away. Fix the shape or ask.
 - Do not silently retry past the configured limit.
 - Do not write a fact into a prompt as an example that could be mistaken for ground truth.

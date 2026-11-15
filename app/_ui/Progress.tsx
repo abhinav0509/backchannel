@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import type { Opportunity } from '../../src/store/repo'
 import type { RunEvent, StageName } from '../../src/types/research'
 import { ownershipLabel, stageLabel, stagesFor } from '../_lib/format'
+import { estimate } from '../_lib/progress'
 
 type State = 'waiting' | 'running' | 'ok' | 'partial' | 'failed'
 
@@ -78,12 +79,26 @@ export function Progress({ o }: { o: Opportunity }) {
   for (const e of o.events) latest.set(e.stage, e)
   const secs = run && now ? Math.max(0, Math.floor((now - new Date(run.started_at).getTime()) / 1000)) : null
   const stages = stagesFor(run?.mode ?? 'triage')
+  const deep = run?.mode === 'deep'
+  const expected = deep ? 300 : 70
+  // Real stage completion sets the floor and ceiling; within them the bar creeps on time, so it
+  // never jumps back or claims a stage is done before it is.
+  const states = stages.map((s) => latest.get(s)?.status)
+  const done = states.filter((x) => x && x !== 'started').length
+  const active = states.filter((x) => x === 'started').length
+  const floor = done / stages.length
+  const ceiling = Math.max(floor, (done + active) / stages.length - 0.02)
+  const fraction = Math.min(ceiling, Math.max(floor, estimate(secs ?? 0, expected, 1).fraction))
+  const slow = (secs ?? 0) > expected * 1.4
 
   return (
     <section aria-live="polite" className="card mb-10 p-6">
       <div className="flex items-baseline justify-between">
         <h2 className="font-semibold">{run?.mode === 'deep' ? 'Researching in depth' : 'Running a quick check'}</h2>
         <span className="t-small tabular-nums text-ink-3">{secs !== null && `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`}</span>
+      </div>
+      <div className="progress-track mt-4" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(fraction * 100)} aria-label="Research progress">
+        <div className="progress-fill" style={{ width: `${Math.max(3, fraction * 100)}%` }} />
       </div>
       <ol className="mt-5 space-y-4">
         {stages.map((s) => {
@@ -104,7 +119,10 @@ export function Progress({ o }: { o: Opportunity }) {
           )
         })}
       </ol>
-      <p className="mt-6 t-micro text-ink-3">You can leave this page. Research keeps running and the result will be in your opportunities.</p>
+      <p className="mt-6 t-micro text-ink-3">
+        {slow ? 'Taking longer than usual; some stages search more when sources are thin. ' : deep ? 'Usually 4 to 6 minutes. ' : 'Usually about a minute. '}
+        You can leave this page: research keeps running, and each section fills in as its stage finishes.
+      </p>
     </section>
   )
 }

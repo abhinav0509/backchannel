@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
+import { Spinner } from './Button'
 import { Segmented } from './Segmented'
 
 type Source = 'email' | 'company'
@@ -143,21 +144,33 @@ export function NewResearch({ variant = 'primary', label = 'New research', short
           {error && <p className="mt-3 rounded-[10px] bg-risk-soft px-3 py-2 t-small text-risk">{error}</p>}
 
           <div className="mt-6 grid gap-2 sm:grid-cols-2">
-            <button type="submit" className="card group p-4 text-left transition-[box-shadow,transform] duration-150 hover:shadow-[0_0_0_1.5px_var(--accent)] active:scale-[0.99] disabled:opacity-50" disabled={!ready}>
+            <button
+              type="submit"
+              aria-busy={pending === 'triage'}
+              className={`card group p-4 text-left transition-[box-shadow,transform,opacity] duration-150 hover:shadow-[0_0_0_1.5px_var(--accent)] active:scale-[0.99] ${pending === 'triage' ? 'cursor-progress shadow-[0_0_0_1.5px_var(--accent)]' : 'disabled:opacity-50'}`}
+              disabled={!ready}
+            >
               <span className="flex items-center justify-between">
-                <span className="font-semibold">{pending === 'triage' ? 'Starting…' : 'Quick check'}</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  {pending === 'triage' && <Spinner className="text-accent" />}
+                  {pending === 'triage' ? 'Starting quick check' : 'Quick check'}
+                </span>
                 <span className="t-micro text-ink-3">about $0.30</span>
               </span>
               <span className="mt-1 block t-small text-ink-2">Red flags in about a minute. Decide whether it is worth more.</span>
             </button>
             <button
               type="button"
-              className="card group p-4 text-left transition-[box-shadow,transform] duration-150 hover:shadow-[0_0_0_1.5px_var(--accent)] active:scale-[0.99] disabled:opacity-50"
+              aria-busy={pending === 'deep'}
+              className={`card group p-4 text-left transition-[box-shadow,transform,opacity] duration-150 hover:shadow-[0_0_0_1.5px_var(--accent)] active:scale-[0.99] ${pending === 'deep' ? 'cursor-progress shadow-[0_0_0_1.5px_var(--accent)]' : 'disabled:opacity-50'}`}
               disabled={!ready}
               onClick={() => void submit('deep')}
             >
               <span className="flex items-center justify-between">
-                <span className="font-semibold">{pending === 'deep' ? 'Starting…' : 'Full research'}</span>
+                <span className="flex items-center gap-2 font-semibold">
+                  {pending === 'deep' && <Spinner className="text-accent" />}
+                  {pending === 'deep' ? 'Starting full research' : 'Full research'}
+                </span>
                 <span className="t-micro text-ink-3">about $2.10</span>
               </span>
               <span className="mt-1 block t-small text-ink-2">Founders, money, people, AI, outlook, scores and interview prep. 4 to 6 minutes.</span>

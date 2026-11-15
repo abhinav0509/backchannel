@@ -1,11 +1,12 @@
 'use client'
 
 import type { TriageResult } from '../../src/types/research'
+import { Button } from './Button'
 import { FlagList } from './report/Brief'
 import { Gaps } from './report/kit'
 
 /** The quick check: is this worth a full look? Leads with the recommendation and what full research would add. */
-export function TriageView({ t, running, onDeep }: { t: TriageResult; running: boolean; onDeep: () => void }) {
+export function TriageView({ t, running, starting = false, onDeep }: { t: TriageResult; running: boolean; starting?: boolean; onDeep: () => void }) {
   const risks = t.flags.filter((f) => f.polarity === 'risk').sort((a, b) => b.severity - a.severity)
   const greens = t.flags.filter((f) => f.polarity === 'green').sort((a, b) => b.severity - a.severity)
   return (
@@ -23,9 +24,9 @@ export function TriageView({ t, running, onDeep }: { t: TriageResult; running: b
             <p className="font-semibold">See the whole company</p>
             <p className="mt-1 t-small text-ink-2">Founders and leaders, what they sell, money, layoffs, AI, where it is heading, six scores and questions to ask. 4 to 6 minutes, about $2.10.</p>
           </div>
-          <button className={`btn ${t.deep_dive.recommended ? 'btn-primary' : 'btn-quiet'}`} onClick={onDeep}>
+          <Button className={t.deep_dive.recommended ? 'btn-primary' : 'btn-quiet'} pending={starting} pendingLabel="Starting" onClick={onDeep}>
             Run full research
-          </button>
+          </Button>
         </section>
       )}
 

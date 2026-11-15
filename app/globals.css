@@ -328,6 +328,45 @@ dialog.sheet::backdrop {
   transform-origin: bottom;
   animation: rise 520ms var(--ease-out) backwards;
 }
+/* A placeholder in the shape of what is coming, so a page never goes blank while it loads. */
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.skeleton {
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--sunken) 30%, var(--line-soft) 50%, var(--sunken) 70%);
+  background-size: 300% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+}
+
+/* A button doing work stays exactly as wide and as solid as it was: only its label changes. */
+.btn[aria-busy='true'] {
+  opacity: 1;
+  cursor: progress;
+}
+
+/* Progress that is known only roughly: a bar that eases toward done without claiming to be there. */
+.progress-track {
+  height: 4px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--sunken);
+}
+.progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 900ms var(--ease-out);
+}
+.progress-fill[data-done='true'] {
+  transition-duration: 250ms;
+}
+
 .meter {
   transition: width 600ms var(--ease-out);
 }

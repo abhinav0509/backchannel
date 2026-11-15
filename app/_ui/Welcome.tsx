@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import type { Profile } from '../../src/types/profile'
 import { ProfileForm } from './ProfileForm'
+import { TaskProgress } from './TaskProgress'
 
 type Step = { at: 'upload' } | { at: 'reading' } | { at: 'review'; draft: Profile }
 
@@ -82,15 +83,23 @@ export function Welcome({ name, updating, allowance }: { name: string | null; up
         <p className="mt-1 t-small text-ink-3">It takes a few seconds. Your CV is read once to fill in your profile, then discarded; you review everything before it is saved.</p>
 
         {step.at === 'reading' ? (
-          <div className="card mt-5 flex items-center gap-4 p-8" aria-live="polite">
-            <svg className="spinner shrink-0" width="22" height="22" viewBox="0 0 18 18" aria-hidden>
-              <circle cx="9" cy="9" r="7" fill="none" stroke="var(--line)" strokeWidth="2" />
-              <path d="M9 2a7 7 0 0 1 7 7" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-            <div>
-              <p className="font-semibold">Reading your CV</p>
-              <p className="t-small text-ink-3">Picking out your experience, skills, domains and projects.</p>
-            </div>
+          <div className="mt-5">
+            <TaskProgress
+              title="Reading your CV"
+              steps={['Reading the document', 'Counting your years across roles', 'Picking out skills and domains', 'Drafting your profile']}
+              expectedSeconds={8}
+              note="Usually a few seconds. Nothing is saved until you review it."
+              preview={
+                <div className="space-y-4">
+                  {[0, 1, 2].map((i) => (
+                    <div key={i} className="grid gap-2 sm:grid-cols-[10rem_1fr] sm:gap-6">
+                      <span className="skeleton block h-3 w-24" />
+                      <span className="skeleton block h-9 w-full rounded-[10px]" />
+                    </div>
+                  ))}
+                </div>
+              }
+            />
           </div>
         ) : paste ? (
           <div className="fill-in mt-5">
