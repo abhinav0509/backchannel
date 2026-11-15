@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import type { Member } from '../../src/server/members'
-import { usd } from '../_lib/format'
+import { age, usd } from '../_lib/format'
 import { Monogram } from './Monogram'
 
 /** Invite friends and family, see who has started, what they have spent, and take access away. */
@@ -116,6 +116,49 @@ export function People({ capUsd }: { capUsd: number }) {
           </ul>
         )}
       </section>
+
+      <FeedbackList />
     </div>
+  )
+}
+
+type Note = { id: number; from: string; page: string; message: string; created_at: string }
+
+/** What people said from inside the app, newest first, each with the page they were on. */
+function FeedbackList() {
+  const [notes, setNotes] = useState<Note[] | null>(null)
+  useEffect(() => {
+    void fetch('/api/feedback', { cache: 'no-store' })
+      .then((r) => (r.ok ? (r.json() as Promise<Note[]>) : []))
+      .then(setNotes)
+      .catch(() => setNotes([]))
+  }, [])
+  return (
+    <section aria-labelledby="feedback-heading" className="mt-12">
+      <h2 id="feedback-heading" className="t-title">
+        Feedback
+      </h2>
+      <p className="mt-1 t-small text-ink-3">From the Feedback button on every page.</p>
+      {notes === null ? (
+        <p className="mt-3 t-small text-ink-3">Loading…</p>
+      ) : notes.length === 0 ? (
+        <p className="mt-3 t-small text-ink-3">Nothing yet.</p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {notes.map((n) => (
+            <li key={n.id} className="card p-4">
+              <p className="whitespace-pre-line">{n.message}</p>
+              <p className="mt-2 flex flex-wrap gap-x-4 t-micro text-ink-3">
+                <span className="font-medium text-ink-2">{n.from}</span>
+                <span suppressHydrationWarning>{age(n.created_at)}</span>
+                <a href={n.page} className="truncate hover:text-accent">
+                  {n.page}
+                </a>
+              </p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

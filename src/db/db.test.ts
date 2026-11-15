@@ -15,10 +15,10 @@ describe('db', () => {
 
   it('applies the migrations once, and again is a no-op', async () => {
     const db = openDb('pglite:memory')
-    expect(await migrate(db)).toEqual(['0001_init.sql', '0002_tracking.sql', '0003_members_rounds.sql'])
+    expect(await migrate(db)).toEqual(['0001_init.sql', '0002_tracking.sql', '0003_members_rounds.sql', '0004_feedback.sql'])
     expect(await migrate(db)).toEqual([])
     const tables = await db.query<{ t: string }>("select tablename as t from pg_tables where schemaname = 'public' order by 1")
-    expect(tables.map((r) => r.t)).toEqual(['llm_cache', 'opportunities', 'profiles', 'rounds', 'run_events', 'runs', 'schema_migrations', 'spend'])
+    expect(tables.map((r) => r.t)).toEqual(['feedback', 'llm_cache', 'opportunities', 'profiles', 'rounds', 'run_events', 'runs', 'schema_migrations', 'spend'])
     await db.close()
   })
 

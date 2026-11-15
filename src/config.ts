@@ -15,4 +15,4 @@ export const BUDGETS = {
 } as const
 
 // What a run usually costs, to refuse one up front that would stop half way for want of budget.
-export const ESTIMATE_USD = { triage: 0.35, deep: 2.2 } as const
+export const ESTIMATE_USD = { triage: 0.35, deep: 2.2, refit: 0.5 } as const

@@ -9,6 +9,7 @@ import { usd } from './_lib/format'
 import { currentUser } from './_lib/session'
 import { Brand } from './_ui/Brand'
 import { Nav } from './_ui/Nav'
+import { Feedback } from './_ui/Feedback'
 import { NewResearch } from './_ui/NewResearch'
 import { SignOut } from './_ui/SignOut'
 import './globals.css'
@@ -64,17 +65,18 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               </div>
               <div className="space-y-3 border-t border-line-soft pt-4">
                 {left && <Spend spent={left.spentUsd} cap={left.capUsd} admin={admin} />}
-                <div className="flex items-center justify-between px-1">
-                  <span className="flex items-center gap-0.5">
-                    <Link href="/profile" className="btn btn-ghost btn-sm">
-                      Your profile
+                <div className="flex flex-wrap items-center gap-0.5 px-1">
+                  <Link href="/profile" className="btn btn-ghost btn-sm">
+                    Your profile
+                  </Link>
+                  {admin && (
+                    <Link href="/people" className="btn btn-ghost btn-sm">
+                      People
                     </Link>
-                    {admin && (
-                      <Link href="/people" className="btn btn-ghost btn-sm">
-                        People
-                      </Link>
-                    )}
-                  </span>
+                  )}
+                  <Suspense>
+                    <Feedback />
+                  </Suspense>
                   {authMode() === 'supabase' && <SignOut />}
                 </div>
               </div>
@@ -83,7 +85,10 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
             <div className="min-w-0">
               <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line-soft bg-canvas/85 px-4 backdrop-blur-xl lg:hidden">
                 <Brand />
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <Suspense>
+                    <Feedback compact />
+                  </Suspense>
                   <Link href="/profile" className="btn btn-ghost btn-sm">
                     Profile
                   </Link>

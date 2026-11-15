@@ -8,7 +8,7 @@ export function SignOut() {
   return (
     <button
       type="button"
-      className="rounded-md t-small text-ink-2 hover:text-ink"
+      className="btn btn-ghost btn-sm"
       onClick={async () => {
         await supabaseBrowser()?.auth.signOut()
         router.replace('/login')

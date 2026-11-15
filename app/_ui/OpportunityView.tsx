@@ -146,6 +146,15 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  /** Re-judges the report against your profile. Returns an error to show, or null when it worked. */
+  async function refit(): Promise<string | null> {
+    const res = await fetch(`/api/opportunities/${o.id}/refit`, { method: 'POST' }).catch(() => null)
+    const body = (await res?.json().catch(() => null)) as (Opportunity & { error?: string }) | null
+    if (!res?.ok || !body || body.error) return body?.error ?? 'The refresh did not complete. Try again in a moment.'
+    setO(body)
+    return null
+  }
+
   async function remove(close: () => void) {
     const res = await fetch(`/api/opportunities/${o.id}`, { method: 'DELETE' }).catch(() => null)
     if (!res?.ok) {
@@ -271,7 +280,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
             <div id="tab-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} key={tab} className="fill-in pt-8">
               {tab === 'brief' && (
                 <div className="grid gap-10 xl:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="min-w-0">{r ? <Brief r={r} hasProfile={hasProfile} onDeep={running ? undefined : () => void start('deep')} /> : t && <TriageView t={t} running={running} onDeep={() => void start('deep')} />}</div>
+                  <div className="min-w-0">{r ? <Brief r={r} hasProfile={hasProfile} onRefit={running ? undefined : refit} /> : t && <TriageView t={t} running={running} onDeep={() => void start('deep')} />}</div>
                   <aside className="space-y-3 xl:sticky xl:top-20 xl:self-start">
                     <Tracker id={o.id} initial={{ notes: o.notes, next_step: o.next_step, next_step_at: o.next_step_at }} />
                     <Rounds oppId={o.id} initial={o.rounds} questions={questions} prep={o.prep} people={people} />

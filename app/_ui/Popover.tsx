@@ -11,6 +11,7 @@ export function Popover({
   trigger,
   children,
   align = 'start',
+  side = 'bottom',
   width = 280,
   className = '',
 }: {
@@ -18,6 +19,7 @@ export function Popover({
   trigger: (open: boolean) => ReactNode
   children: (close: () => void) => ReactNode
   align?: 'start' | 'end'
+  side?: 'bottom' | 'top' // top for triggers near the bottom of the screen
   width?: number
   className?: string
 }) {
@@ -72,7 +74,7 @@ export function Popover({
           role="dialog"
           aria-label={label}
           onClick={(e) => e.stopPropagation()}
-          className={`pop absolute top-[calc(100%+6px)] z-40 rounded-[14px] bg-surface p-1.5 shadow-[var(--shadow-pop)] ${align === 'end' ? 'right-0 origin-top-right' : 'left-0 origin-top-left'}`}
+          className={`pop absolute z-40 rounded-[14px] bg-surface p-1.5 shadow-[var(--shadow-pop)] ${side === 'top' ? 'bottom-[calc(100%+6px)]' : 'top-[calc(100%+6px)]'} ${align === 'end' ? 'right-0' : 'left-0'} ${side === 'top' ? (align === 'end' ? 'origin-bottom-right' : 'origin-bottom-left') : align === 'end' ? 'origin-top-right' : 'origin-top-left'}`}
           style={{ width }}
         >
           {children(() => setOpen(false))}

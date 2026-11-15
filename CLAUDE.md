@@ -18,7 +18,9 @@ People: the admin (ALLOWED_EMAILS, user id BACKCHANNEL_OWNER) invites others fro
 invitee is let in by `app_metadata.backchannel_role = 'member'`, set with the secret key, never by
 user-editable metadata. Spend is recorded per owner: invitees have their own monthly cap
 (`BUDGETS.memberMonthlyUsd`) inside the overall one, checked before a run starts and on every call.
-A CV is read once into a profile draft (`src/profile/import.ts`) and never stored.
+A CV is read once into a profile draft (`src/profile/import.ts`) and never stored. Refresh for my
+profile (`src/server/refit.ts`) re-runs synthesis alone on a stored report. Functions run in syd1
+(`vercel.json`), next to the Supabase database in ap-southeast-2.
 
 ## Principles that override convenience
 
