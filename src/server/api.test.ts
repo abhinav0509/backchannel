@@ -217,3 +217,16 @@ describe('rounds', () => {
     expect((await api.roundCalendar(OTHER, a.id, 'https://app.example')).status).toBe(404)
   })
 })
+
+describe('inbox', () => {
+  it('returns the summaries and the agenda together, with how many changes the last research found', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const report = validReport()
+    report.changes = { since: '2026-11-01T00:00:00.000Z', items: [{ section: 'news', kind: 'new', title: 'T', date: null, evidence_urls: [] }] }
+    await repo.patchOpportunity(ME, o.id, { status: 'done', report })
+    await api.addRound(ME, o.id, { kind: 'panel', at: new Date(Date.now() + 3_600_000).toISOString() })
+    const r = await api.inbox(ME)
+    expect(r.items[0]).toMatchObject({ changes: { since: '2026-11-01T00:00:00.000Z', count: 1 } })
+    expect(r.agenda).toEqual([expect.objectContaining({ type: 'upcoming', opportunity: expect.objectContaining({ id: o.id }) })])
+  })
+})

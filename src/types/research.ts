@@ -211,6 +211,21 @@ export const Press = z.object({
   own: z.array(claim(PressItem)).max(6),
 })
 
+/**
+ * What differs from the previous research, computed without a model. new: dated after the last
+ * research; found: older, but the last research did not have it; moved: a score changed; gone: a
+ * flag no longer raised.
+ */
+export const ChangeItem = z.object({
+  section: z.enum(['money', 'layoffs', 'leadership', 'leaders', 'news', 'ai', 'press', 'contacts', 'scores', 'flags']),
+  kind: z.enum(['new', 'found', 'moved', 'gone']),
+  title: z.string(),
+  date: PartialDate.nullable(),
+  evidence_urls: z.array(z.url()),
+  score: z.object({ dimension: ScoreDimension, from: z.number().nullable(), to: z.number().nullable() }).optional(),
+})
+export const Changes = z.object({ since: z.iso.datetime(), items: z.array(ChangeItem).max(40) })
+
 export const QuestionTopic = z.enum(['role', 'team', 'company', 'money', 'future', 'ai', 'culture', 'comp'])
 
 /** An interview question, why it is worth asking, and what it is about. */
@@ -270,6 +285,7 @@ export const CompanyResearch = z.object({
   verdict: z.string(),
   outlook: z.string().nullable().default(null), // synthesis's read on where the company is heading, labelled as a read
   fit: Fit.nullable().default(null), // null without a profile
+  changes: Changes.nullable().default(null), // null on a company's first full research
   gaps: z.array(z.string()),
   run: Run,
 })
@@ -303,6 +319,8 @@ export type Question = z.infer<typeof Question>
 export type Contact = z.infer<typeof Contact>
 export type Press = z.infer<typeof Press>
 export type Fit = z.infer<typeof Fit>
+export type Changes = z.infer<typeof Changes>
+export type ChangeItem = z.infer<typeof ChangeItem>
 export type PressItem = z.infer<typeof PressItem>
 export type ContactRelation = z.infer<typeof ContactRelation>
 export type QuestionTopic = z.infer<typeof QuestionTopic>

@@ -7,6 +7,7 @@ import type { Opportunity } from '../store/repo'
 import { Domain, type Flag, type ScoreDimension, type StageName } from '../types/research'
 import { RoundPatch, TrackingPatch, type Pipeline, type PipelineReason, type Round } from '../types/tracking'
 import { roundIcs } from '../report/ics'
+import { agenda, type AgendaItem } from './agenda'
 import { allowance } from '../util/cost'
 import { slug } from '../util/slug'
 import { researchWorkflow, type Ctx } from '../workflows/research'
@@ -64,6 +65,7 @@ export interface Summary {
   next_step: string | null
   next_step_at: string | null
   next_round: { kind: Round['kind']; at: string } | null
+  changes: { since: string; count: number } | null // what the latest research found that the one before did not
 }
 
 const firstSentence = (s: string) => s.match(/^.*?[.!?](?=\s|$)/)?.[0] ?? s
@@ -100,10 +102,17 @@ function summarise(o: Opportunity): Summary {
     next_step: o.next_step,
     next_step_at: o.next_step_at,
     next_round: nextRound(o.rounds),
+    changes: o.report?.changes?.items.length ? { since: o.report.changes.since, count: o.report.changes.items.length } : null,
   }
 }
 
 export const list = async (owner: string): Promise<Reply> => reply(200, (await repo.listOpportunities(owner)).map(summarise))
+
+/** The inbox in one load: every opportunity's summary, and what needs you now. */
+export async function inbox(owner: string): Promise<{ items: Summary[]; agenda: AgendaItem[] }> {
+  const all = await repo.listOpportunities(owner)
+  return { items: all.map(summarise), agenda: agenda(all) }
+}
 
 export async function get(owner: string, id: string): Promise<Reply> {
   const o = await repo.getOpportunity(owner, id)

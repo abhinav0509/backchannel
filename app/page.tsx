@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getProfile, list, type Summary } from '../src/server/api'
+import { getProfile, inbox } from '../src/server/api'
 import { PIPELINE, type Pipeline } from '../src/types/pipeline'
 import { requireOwner } from './_lib/session'
 import { AutoRefresh } from './_ui/AutoRefresh'
@@ -9,8 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function Page({ searchParams }: { searchParams: Promise<{ stage?: string; view?: string; skip?: string }> }) {
   const owner = await requireOwner()
-  const [r, profile] = await Promise.all([list(owner), getProfile(owner)])
-  const items = r.body as Summary[]
+  const [{ items, agenda }, profile] = await Promise.all([inbox(owner), getProfile(owner)])
   // Someone brand new starts with their CV, not an empty inbox. Skipping it leaves research for later.
   const q = await searchParams
   if (!items.length && profile.body === null && q.skip === undefined) redirect('/welcome')
@@ -18,7 +17,7 @@ export default async function Page({ searchParams }: { searchParams: Promise<{ s
   return (
     <>
       <AutoRefresh active={items.some((o) => o.status === 'running')} />
-      <Inbox items={items} stage={stage} view={q.view === 'board' ? 'board' : 'list'} today={new Date().toISOString().slice(0, 10)} />
+      <Inbox items={items} agenda={agenda} stage={stage} view={q.view === 'board' ? 'board' : 'list'} today={new Date().toISOString().slice(0, 10)} />
     </>
   )
 }

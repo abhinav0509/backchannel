@@ -107,6 +107,7 @@ export function draftReport(p: { parsed: ParseOut; identity: Identity; resolveGa
     market: p.market.data ? strip(p.market.data) : null,
     contacts: p.contacts.data?.contacts ?? null,
     press: p.press.data ? strip(p.press.data) : null,
+    changes: null, // set when the run is stored, by comparing with the report it replaces (store/runner)
     role: p.parsed.role,
     gaps: unique([
       ...p.resolveGaps,

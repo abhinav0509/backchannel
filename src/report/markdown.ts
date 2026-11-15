@@ -138,7 +138,21 @@ ${claims(mkt.headwinds, String)}
 
 > ${meta}
 
-## Verdict
+${
+  r.changes?.items.length
+    ? `## What changed since ${r.changes.since.slice(0, 10)}
+
+${r.changes.items
+  .map((i) =>
+    i.score
+      ? `- ${label(i.score.dimension)}: ${i.score.from ?? 'unknown'} to ${i.score.to ?? 'unknown'}`
+      : `- ${{ new: 'New', found: 'Found this time', moved: 'Moved', gone: 'No longer flagged' }[i.kind]}: ${i.title}${i.date ? ` (${i.date})` : ''}${refs(i.evidence_urls)}`,
+  )
+  .join('\n')}
+
+`
+    : ''
+}## Verdict
 
 ${r.verdict || 'Not available.'}
 

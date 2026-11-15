@@ -5,6 +5,7 @@ import type { CompanyResearch, Flag, Score } from '../../../src/types/research'
 import { DIMENSION_ORDER, dimensionLabel, flagLabel, splitLead } from '../../_lib/format'
 import { Cites } from '../Evidence'
 import { Signal } from '../Signal'
+import { Changes } from './Changes'
 import { Gaps } from './kit'
 
 export function FlagList({ title, flags, tone, empty }: { title: string; flags: Flag[]; tone: 'risk' | 'green'; empty: string }) {
@@ -166,6 +167,8 @@ export function Brief({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfi
           Some research did not finish, so parts of this report are missing. Sources shows which.
         </p>
       )}
+
+      {r.changes && <Changes c={r.changes} />}
 
       <section aria-label="Verdict">
         <p className="t-lede max-w-[36ch] text-ink">{lead}</p>

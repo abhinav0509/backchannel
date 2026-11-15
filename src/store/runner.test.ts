@@ -54,3 +54,20 @@ describe('runInProcess (CLI)', () => {
     expect(await repo.getOpportunity(ME, o.id)).toMatchObject({ status: 'failed', error: 'monthly cap of $20 reached' })
   })
 })
+
+describe('what changed', () => {
+  it('a second full research records what differs from the first; the first records nothing', async () => {
+    const { applyOutcome } = await import('./runner')
+    const { validReport } = await import('../test/fixtures')
+    const o = await repo.createOpportunity(ME, 'x')
+    const first = { ...validReport(), generated_at: '2026-11-01T00:00:00.000Z', scores: [{ dimension: 'culture' as const, value: 70, rationale: 'r', evidence_urls: [], unknown: false }] }
+    const r1 = await repo.beginRun(ME, o.id, 'deep')
+    await applyOutcome(ME, o.id, r1, { kind: 'report', report: first })
+    expect((await repo.getOpportunity(ME, o.id))!.report!.changes).toBeNull()
+    const second = { ...first, generated_at: '2026-11-15T00:00:00.000Z', scores: [{ ...first.scores[0]!, value: 40 }] }
+    const r2 = await repo.beginRun(ME, o.id, 'deep')
+    await applyOutcome(ME, o.id, r2, { kind: 'report', report: second })
+    const got = (await repo.getOpportunity(ME, o.id))!.report!.changes
+    expect(got).toMatchObject({ since: '2026-11-01T00:00:00.000Z', items: [{ kind: 'moved', score: { dimension: 'culture', from: 70, to: 40 } }] })
+  })
+})

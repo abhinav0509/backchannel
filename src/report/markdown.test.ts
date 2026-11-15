@@ -42,6 +42,7 @@ const report = (): CompanyResearch => ({
   verdict: 'Main risk is layoffs.',
   outlook: 'Placeholder outlook.',
   fit: { summary: 'A fair fit.', strengths: ['Fintech checkout work'], gaps: ['No B2B'], talking_points: ['Your checkout redesign'] },
+  changes: null,
   gaps: ['Compensation could not be established.'],
   run: { mode: 'deep', searches_used: 12, input_tokens: 1000, output_tokens: 100, cost_usd: 1.234, duration_ms: 200_000, stage_status: { money: 'ok', people: 'partial' } },
 })
@@ -65,6 +66,16 @@ describe('toMarkdown', () => {
     expect(md).toContain('## People to know')
     expect(md).toMatch(/Person Placeholder, Design Manager, likely hiring manager, possible match/)
     expect(md).toContain('https://www.linkedin.com/in/placeholder')
+  })
+
+  it('opens with what changed since the last research, when there was one', () => {
+    const m = toMarkdown({ ...report(), changes: { since: '2026-11-01T00:00:00.000Z', items: [
+      { section: 'news', kind: 'new', title: 'Cuts 8% of staff', date: '2026-11-10', evidence_urls: [A] },
+      { section: 'scores', kind: 'moved', title: 'job_security', date: null, evidence_urls: [], score: { dimension: 'job_security', from: 60, to: 41 } },
+    ] } })
+    expect(m.indexOf('## What changed since 2026-11-01')).toBeLessThan(m.indexOf('## Verdict'))
+    expect(m).toMatch(/- New: Cuts 8% of staff \(2026-11-10\) \[1\]/)
+    expect(m).toContain('- Job security: 60 to 41')
   })
 
   it('says how the role fits the candidate, right after the verdict', () => {

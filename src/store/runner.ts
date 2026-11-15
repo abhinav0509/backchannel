@@ -2,6 +2,7 @@ import { runResearch, message } from '../pipeline/run'
 import type { Candidate } from '../pipeline/stage1-resolve'
 import { loadProfile } from '../types/profile'
 import type { CompanyResearch, TriageResult } from '../types/research'
+import { diffReports } from '../report/changes'
 import { beginRun, finishRun, getOpportunity, getProfile, recordEvent } from './repo'
 
 export type Outcome =
@@ -19,6 +20,9 @@ export async function applyOutcome(owner: string, oppId: string, runId: string, 
       return finishRun(owner, oppId, runId, { status: 'needs_choice', candidates: o.candidates, choice_reason: o.reason })
     case 'triage':
     case 'report': {
+      // A repeat full research records what differs from the one it replaces.
+      const prev = o.kind === 'report' ? (await getOpportunity(owner, oppId))?.report : null
+      const report = o.kind === 'report' && prev ? { ...o.report, changes: diffReports(prev, o.report) } : o.kind === 'report' ? o.report : null
       const r = o.kind === 'triage' ? o.result : o.report
       return finishRun(owner, oppId, runId, {
         status: 'done',
@@ -26,7 +30,7 @@ export async function applyOutcome(owner: string, oppId: string, runId: string, 
         choice_reason: null,
         domain: r.identity.domain,
         company: r.identity.display_name,
-        ...(o.kind === 'triage' ? { triage: o.result } : { report: o.report }),
+        ...(o.kind === 'triage' ? { triage: o.result } : { report: report! }), // non-null: set above whenever o.kind is report
       })
     }
   }

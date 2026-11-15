@@ -8,7 +8,9 @@ import { PIPELINE, PIPELINE_GROUPS, type Pipeline } from '../../src/types/pipeli
 import { ROUND_LABEL } from '../../src/report/ics'
 import { stageLabel } from '../_lib/format'
 import { STAGE } from '../_lib/pipeline'
+import type { AgendaItem } from '../../src/server/agenda'
 import { Monogram } from './Monogram'
+import { UpNext } from './UpNext'
 import { NewResearch } from './NewResearch'
 import { MenuItem, Popover } from './Popover'
 import { Segmented } from './Segmented'
@@ -68,11 +70,18 @@ function ResearchLine({ o }: { o: Summary }) {
   if (o.status === 'failed') return <span className="t-small text-risk">Research stopped. Open to retry.</span>
   if (!o.headline) return <span className="t-small text-ink-3">No research yet</span>
   return (
-    <span className="line-clamp-2 t-small text-ink-2">
-      {o.depth === 'triage' && (
-        <span className={`mr-1 font-semibold ${o.recommendation === 'deep' ? 'text-accent' : 'text-ink-3'}`}>{o.recommendation === 'deep' ? 'Worth a closer look.' : 'Probably skip.'}</span>
+    <span className="block">
+      <span className="line-clamp-2 t-small text-ink-2">
+        {o.depth === 'triage' && (
+          <span className={`mr-1 font-semibold ${o.recommendation === 'deep' ? 'text-accent' : 'text-ink-3'}`}>{o.recommendation === 'deep' ? 'Worth a closer look.' : 'Probably skip.'}</span>
+        )}
+        {o.headline}
+      </span>
+      {o.changes && (
+        <span className="mt-1 inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 t-micro font-medium text-accent" suppressHydrationWarning>
+          {o.changes.count} {o.changes.count === 1 ? 'change' : 'changes'} since {new Date(o.changes.since).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
       )}
-      {o.headline}
     </span>
   )
 }
@@ -209,7 +218,7 @@ function Empty() {
 }
 
 /** Your opportunities, by where they stand: a list grouped by stage, or a board across the pipeline. */
-export function Inbox({ items, stage, view: initialView, today }: { items: Summary[]; stage: Pipeline | null; view: View; today: string }) {
+export function Inbox({ items, agenda, stage, view: initialView, today }: { items: Summary[]; agenda: AgendaItem[]; stage: Pipeline | null; view: View; today: string }) {
   const router = useRouter()
   const [view, setView] = useState<View>(initialView)
   const [query, setQuery] = useState('')
@@ -261,6 +270,8 @@ export function Inbox({ items, stage, view: initialView, today }: { items: Summa
           />
         </div>
       </header>
+
+      {!stage && <UpNext agenda={agenda} />}
 
       {/* Phones have no sidebar: the stages scroll across the top instead. */}
       <nav aria-label="Stages" className="-mx-4 mt-5 flex gap-1.5 overflow-x-auto px-4 pb-1 lg:hidden">
