@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { suspectInjection } from '../../src/llm/untrusted'
 import type { Opportunity } from '../../src/store/repo'
 import { age, usd } from '../_lib/format'
 import { sourceIndex } from '../_lib/sources'
 import { TABS, type Tab } from '../_lib/tabs'
+import { TabBar } from './TabBar'
 import { supabaseBrowser } from '../_lib/supabase-browser'
 import { Button, Spinner } from './Button'
 import { Choice } from './Choice'
@@ -23,18 +25,6 @@ import { RunView } from './RunView'
 import { StagePicker } from './StagePicker'
 import { SkeletonLines } from './TaskProgress'
 import { TriageView } from './TriageView'
-
-const LABEL: Record<Tab, string> = {
-  brief: 'Brief',
-  company: 'What they do',
-  people: 'Founders & people',
-  money: 'Money',
-  ai: 'AI',
-  outlook: 'Outlook',
-  press: 'In the press',
-  prep: 'Prep',
-  sources: 'Sources',
-}
 
 /**
  * Keeps the page current while research runs, so each section fills in the moment its stage
@@ -63,50 +53,6 @@ function useLive(initial: Opportunity, realtime: boolean) {
   return [o, setO] as const
 }
 
-/** Tabs with an underline that slides to the selection. Arrow keys move between them. */
-function TabBar({ tabs, value, onChange, badge }: { tabs: readonly Tab[]; value: Tab; onChange: (t: Tab) => void; badge: Partial<Record<Tab, string>> }) {
-  const refs = useRef(new Map<Tab, HTMLButtonElement>())
-  const [bar, setBar] = useState<{ left: number; width: number } | null>(null)
-  useLayoutEffect(() => {
-    const el = refs.current.get(value)
-    if (el) {
-      setBar({ left: el.offsetLeft, width: el.offsetWidth })
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    }
-  }, [value, tabs])
-  return (
-    <div role="tablist" aria-label="Report sections" className="relative -mx-1 flex overflow-x-auto px-1 [scrollbar-width:none]">
-      {tabs.map((t) => (
-        <button
-          key={t}
-          ref={(el) => {
-            if (el) refs.current.set(t, el)
-          }}
-          role="tab"
-          id={`tab-${t}`}
-          aria-selected={t === value}
-          aria-controls="tab-panel"
-          tabIndex={t === value ? 0 : -1}
-          onClick={() => onChange(t)}
-          onKeyDown={(e) => {
-            const i = tabs.indexOf(value)
-            const next = e.key === 'ArrowRight' ? tabs[(i + 1) % tabs.length] : e.key === 'ArrowLeft' ? tabs[(i - 1 + tabs.length) % tabs.length] : null
-            if (next) {
-              onChange(next)
-              refs.current.get(next)?.focus()
-            }
-          }}
-          className={`relative flex h-11 shrink-0 items-center gap-1.5 px-3 t-small font-semibold whitespace-nowrap transition-colors duration-150 ${t === value ? 'text-ink' : 'text-ink-3 hover:text-ink-2'}`}
-        >
-          {LABEL[t]}
-          {badge[t] && <span className="rounded-full bg-sunken px-1.5 text-[11px] tabular-nums text-ink-3">{badge[t]}</span>}
-        </button>
-      ))}
-      {bar && <span aria-hidden className="absolute bottom-0 h-[2px] rounded-full bg-ink transition-[left,width] duration-200 ease-[var(--ease-out)]" style={{ left: bar.left + 10, width: bar.width - 20 }} />}
-    </div>
-  )
-}
-
 export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile }: { initial: Opportunity; realtime: boolean; tab: Tab | null; hasProfile: boolean }) {
   const router = useRouter()
   const [o, setO] = useLive(initial, realtime)
@@ -132,6 +78,25 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
     else url.searchParams.set('tab', next)
     window.history.replaceState(null, '', url)
   }
+
+  const [sharing, setSharing] = useState<{ open: boolean; busy: boolean; error: string | null; copied: boolean }>({ open: false, busy: false, error: null, copied: false })
+  const shareUrl = o.share_id ? `${typeof window === 'undefined' ? '' : window.location.origin}/r/${o.share_id}` : null
+  const injected = useMemo(() => suspectInjection(o.text), [o.text])
+
+  async function setShared(on: boolean) {
+    setSharing((x) => ({ ...x, open: true, busy: true, error: null, copied: false }))
+    const res = await fetch(`/api/opportunities/${o.id}/share`, { method: on ? 'POST' : 'DELETE' }).catch(() => null)
+    const body = (await res?.json().catch(() => null)) as { share_id?: string | null; error?: string } | null
+    if (!res?.ok || !body) return setSharing((x) => ({ ...x, busy: false, error: body?.error ?? 'Could not change sharing. Try again.' }))
+    setO((x) => ({ ...x, share_id: body.share_id ?? null }))
+    setSharing({ open: on, busy: false, error: null, copied: false })
+  }
+
+  const copyShare = (url: string) =>
+    void navigator.clipboard?.writeText(url).then(() => {
+      setSharing((x) => ({ ...x, copied: true }))
+      setTimeout(() => setSharing((x) => ({ ...x, copied: false })), 1400)
+    })
 
   // Which research is being started, so the button that started it can show it is working.
   const [starting, setStarting] = useState<'triage' | 'deep' | null>(null)
@@ -257,6 +222,11 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
                     {(r || t) && (
                       <MenuItem onClick={() => (close(), (window.location.href = `/api/opportunities/${o.id}/report`))}>Download report</MenuItem>
                     )}
+                    {r && (
+                      <MenuItem onClick={() => (close(), o.share_id ? setSharing((x) => ({ ...x, open: true })) : void setShared(true))}>
+                        {o.share_id ? 'Copy share link' : 'Share a read-only link'}
+                      </MenuItem>
+                    )}
                     <div className="my-1 border-t border-line-soft" />
                     <MenuItem tone="risk" disabled={running} onClick={() => setConfirmDelete(true)}>
                       {running ? 'Delete after research finishes' : 'Delete'}
@@ -267,6 +237,36 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
             </Popover>
           </div>
         </header>
+
+        {sharing.open && (
+          <section aria-label="Sharing" className="card fill-in mt-6 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="max-w-[56ch]">
+                <p className="t-small font-semibold">{o.share_id ? 'Anyone with this link can read the research' : 'Creating a read-only link'}</p>
+                <p className="mt-0.5 t-micro text-ink-3">Your notes, prep, interview rounds, how you fit, profile-based scores and flags, the people tied to the role and the recruiter’s email stay private. The verdict and questions were written for you, so they can mention your experience.</p>
+              </div>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSharing((x) => ({ ...x, open: false }))}>
+                Done
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <input readOnly value={shareUrl ?? ''} placeholder="Creating link" aria-label="Share link" onFocus={(e) => e.currentTarget.select()} className="field min-w-0 flex-1 basis-64 py-1.5 text-[13px]" />
+              <Button type="button" className="btn-primary btn-sm" disabled={!shareUrl} pending={sharing.busy && !o.share_id} pendingLabel="Creating" onClick={() => shareUrl && copyShare(shareUrl)}>
+                {sharing.copied ? 'Copied' : 'Copy link'}
+              </Button>
+              {o.share_id && (
+                <Button type="button" className="btn-ghost btn-sm text-risk" pending={sharing.busy} pendingLabel="Stopping" onClick={() => void setShared(false)}>
+                  Stop sharing
+                </Button>
+              )}
+            </div>
+            {sharing.error && (
+              <p className="mt-2 t-micro text-risk" role="alert">
+                {sharing.error}
+              </p>
+            )}
+          </section>
+        )}
 
         {startError && (
           <p className="fill-in mt-6 rounded-[12px] bg-risk-soft px-4 py-3 t-small text-risk" role="alert">
@@ -331,7 +331,7 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
                   talkingPoints={r.fit?.talking_points ?? []}
                 />
               )}
-              {tab === 'sources' && <RunView o={o} />}
+              {tab === 'sources' && <RunView report={r ?? t} runs={o.runs} inspect={(runId) => `/o/${o.id}/runs/${runId}`} />}
             </div>
           </>
         )}
@@ -345,7 +345,12 @@ export function OpportunityView({ initial, realtime, tab: initialTab, hasProfile
           </div>
         )}
 
-        <details className="group mt-16">
+        {injected.length > 0 && (
+          <p className="mt-16 rounded-[12px] bg-amber-soft px-4 py-3 t-small text-ink-2">
+            <span className="font-semibold text-ink">This text contains instructions aimed at an AI</span> (“{injected[0]}”). Backchannel read them as part of the email and did not follow them.
+          </p>
+        )}
+        <details className={`group ${injected.length ? 'mt-3' : 'mt-16'}`}>
           <summary className="cursor-pointer list-none t-small text-ink-3 hover:text-ink-2">
             <span className="mr-1 inline-block transition-transform duration-200 group-open:rotate-90">›</span> {o.text.startsWith('Research this company.') ? 'How it was added' : 'What the recruiter sent'}
           </summary>

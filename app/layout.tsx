@@ -92,7 +92,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
                   <Link href="/profile" className="btn btn-ghost btn-sm">
                     Profile
                   </Link>
-                  <div className="w-[96px]">
+                  <div className="w-[84px]">
                     <NewResearch label="New" />
                   </div>
                 </div>

@@ -43,7 +43,14 @@ profile (`src/server/refit.ts`) re-runs synthesis alone on a stored report. Func
 - Zod schema is the single source of truth for every shape crossing a boundary. Derive TS types from
   the schema with `z.infer`, do not write them twice.
 - One stage per file. A stage is: input type, prompt, output schema, budget. No shared mutable state.
-- Every LLM call goes through `llm/call.ts`. No direct SDK calls from stage files.
+- Every LLM call goes through `llm/call.ts`. No direct SDK calls from stage files. It adds
+  `UNTRUSTED_RULE` to every system prompt and records each call (`budget.record`, table
+  `run_calls`) for the run inspector at `/o/[id]/runs/[runId]`.
+- Text the app did not write (a recruiter email, a CV, the profile, web-derived notes and research)
+  goes into a prompt only through `untrusted()` (`src/llm/untrusted.ts`), so it cannot close its
+  own block. `suspectInjection` is a tripwire for display and logs, not the defence.
+- A shared report (`/r/[shareId]`, public, `getShared`) never carries the pasted text, notes, prep,
+  rounds, fit, profile-based flags and scores, or contacts. Strip in `getShared`, not in the UI.
 - Prompts live in the stage file they belong to, as exported template functions. Not in a prompts/
   folder, not in the database, not inline in the middle of logic.
 - Relative imports are extensionless: the workflow compiler resolves imports literally.

@@ -208,3 +208,86 @@ describe('profiles', () => {
 
   it('rejects an invalid profile', async () => expect(repo.saveProfile(ME, { years_experience: 'eight' })).rejects.toThrow())
 })
+
+describe('run trace', () => {
+  it('returns one run’s stage events and model calls, for its owner only', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    const runId = await repo.beginRun(ME, o.id, 'deep')
+    await repo.recordEvent(ME, o.id, runId, { stage: 'money', status: 'started', at: '2026-11-13T09:00:00.000Z' })
+    await repo.recordEvent(ME, o.id, runId, { stage: 'money', status: 'ok', at: '2026-11-13T09:00:40.000Z', output: { big: 'not needed' } })
+    const budget = await runBudget('deep', runId)
+    await budget.record({ stage: 'money', kind: 'search', model: 'claude-sonnet-5-5', at: '2026-11-13T09:00:01.000Z', ms: 30000, cached: false, usd: 0.2, input_tokens: 9000, output_tokens: 800, searches: 6, detail: { queries: ['acme funding'], found: 12, cited: 4 } })
+
+    const t = await repo.runTrace(ME, o.id, runId)
+    expect(t?.run.id).toBe(runId)
+    expect(t?.events).toEqual([
+      { stage: 'money', status: 'started', at: '2026-11-13T09:00:00.000Z', error: null },
+      { stage: 'money', status: 'ok', at: '2026-11-13T09:00:40.000Z', error: null },
+    ])
+    expect(t?.calls).toHaveLength(1)
+    expect(t?.calls[0]).toMatchObject({ stage: 'money', kind: 'search', usd: 0.2, detail: { queries: ['acme funding'], found: 12, cited: 4, suspect: [], dropped: [] } })
+    expect(await repo.runTrace(OTHER, o.id, runId)).toBeNull()
+    expect(await repo.runTrace(ME, o.id, 'nope')).toBeNull()
+  })
+})
+
+describe('sharing', () => {
+  const withReport = async () => {
+    const o = await repo.createOpportunity(ME, 'Hi, I am Priya Sharma, priya@example.com. Notes are private.')
+    await repo.patchOpportunity(ME, o.id, { report: {
+        ...validReport(),
+        fit: { summary: 'Fits my CV closely', strengths: ['x'], gaps: [], talking_points: [] },
+        flags: [{ kind: 'domain_fit', polarity: 'green', severity: 3, title: 'Matches my fintech years', detail: 'd', basis: 'profile', evidence: [] }],
+        scores: [
+          { dimension: 'role_fit', value: 80, rationale: 'Matches my CV', evidence_urls: [], unknown: false },
+          { dimension: 'culture', value: 60, rationale: 'Reviews are mixed', evidence_urls: [], unknown: false },
+        ],
+      }, status: 'done' })
+    await repo.updateTracking(ME, o.id, { notes: 'my private notes' })
+    return o
+  }
+
+  it('refuses to share before there is a report', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    await expect(repo.setShared(ME, o.id, true)).rejects.toThrow(/no report/)
+  })
+
+  it('shares under an unguessable id, shows only the research, and stops when turned off', async () => {
+    const o = await withReport()
+    const shareId = await repo.setShared(ME, o.id, true)
+    expect(shareId).toMatch(/^[a-f0-9]{32}$/)
+    expect(await repo.setShared(ME, o.id, true)).toBe(shareId) // sharing again keeps the same link
+    expect((await repo.getOpportunity(ME, o.id))?.share_id).toBe(shareId)
+
+    const s = await repo.getShared(shareId!)
+    expect(s?.report.identity).toEqual(validReport().identity)
+    expect(s?.report.fit).toBeNull() // judged against the owner's CV
+    expect(s?.report.contacts).toBeNull() // named people stay off public pages
+    const json = JSON.stringify(s)
+    expect(s?.report.scores.map((x) => x.dimension)).toEqual(['culture'])
+    for (const secret of ['Fits my CV', 'fintech years', 'Matches my CV', 'Priya', 'priya@example.com', 'my private notes', ME]) expect(json).not.toContain(secret)
+
+    await repo.setShared(ME, o.id, false)
+    expect(await repo.getShared(shareId!)).toBeNull()
+  })
+
+  it('only the owner can share', async () => {
+    const o = await withReport()
+    await expect(repo.setShared(OTHER, o.id, true)).rejects.toThrow(/no opportunity/)
+  })
+})
+
+describe('shared trace and demo', () => {
+  it('shows the trace of the run behind a shared report, and offers the admin’s latest share as the demo', async () => {
+    process.env.BACKCHANNEL_OWNER = ME
+    const o = await repo.createOpportunity(ME, 'x')
+    const runId = await repo.beginRun(ME, o.id, 'deep')
+    await repo.finishRun(ME, o.id, runId, { status: 'done', report: validReport() })
+    expect(await repo.demoShareId()).toBeNull()
+    const shareId = (await repo.setShared(ME, o.id, true))!
+    expect((await repo.sharedTrace(shareId))?.run.id).toBe(runId)
+    expect(await repo.sharedTrace('0'.repeat(32))).toBeNull()
+    expect(await repo.demoShareId()).toBe(shareId)
+    delete process.env.BACKCHANNEL_OWNER
+  })
+})

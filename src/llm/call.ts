@@ -2,15 +2,35 @@ import type Anthropic from '@anthropic-ai/sdk'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { z } from 'zod'
 import { BudgetExceeded, type Budget } from '../util/cost'
+import { log } from '../util/log'
 import type { StageName } from '../types/research'
-import { assertSearchSupported, send } from './client'
+import type { CallRecord } from '../types/trace'
+import { assertSearchSupported, send, type Sent } from './client'
 import { validateSourced } from './evidence'
 import { webSearchTool } from './search'
+import { suspectInjection, UNTRUSTED_RULE } from './untrusted'
+
+const withRule = (system: string) => `${system}\n\n${UNTRUSTED_RULE}`
 
 const MAX_RETRIES = 2
 type Effort = 'low' | 'medium' | 'high' | 'xhigh' | 'max'
 
 export class ValidationFailed extends Error {}
+
+/** What the run inspector keeps about one call. */
+const traced = (stage: StageName, kind: CallRecord['kind'], sent: Sent, at: string, detail: CallRecord['detail']): CallRecord => ({
+  stage,
+  kind,
+  model: sent.model,
+  at,
+  ms: sent.ms,
+  cached: sent.cached,
+  usd: sent.spend.usd,
+  input_tokens: sent.spend.input + sent.spend.cacheRead + sent.spend.cacheWrite,
+  output_tokens: sent.spend.output,
+  searches: sent.spend.searches,
+  detail,
+})
 
 const textOf = (content: Anthropic.Beta.BetaContentBlock[]) =>
   content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('')
@@ -48,11 +68,12 @@ export async function callStructured<S extends z.ZodType>(o: {
   let messages: Anthropic.Beta.BetaMessageParam[] = [{ role: 'user', content: withDocument(prompt) }]
   let issues = ''
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const { content, truncated } = await send(
+    const at = new Date().toISOString()
+    const sent = await send(
       {
         model: o.model,
         max_tokens: 16000,
-        system: o.system,
+        system: withRule(o.system),
         messages,
         ...(o.thinking === false && { thinking: { type: 'disabled' as const } }),
         ...((constrained || o.effort) && {
@@ -61,7 +82,16 @@ export async function callStructured<S extends z.ZodType>(o: {
       },
       { stage: o.stage, budget: o.budget },
     )
+    const { content, truncated } = sent
     const result = validateSourced(textOf(content), o.schema, o.retrievedUrls)
+    await o.budget.record(
+      traced(o.stage, 'structured', sent, at, {
+        attempt: attempt + 1,
+        outcome: result.ok ? 'valid' : truncated ? 'cut_off' : 'invalid',
+        issues: result.ok ? null : result.issues.slice(0, 800),
+        dropped: result.ok ? result.dropped : [],
+      }),
+    )
     if (result.ok) return { data: result.data, dropped: result.dropped }
     issues = result.issues
     if (truncated) {
@@ -113,17 +143,19 @@ export async function callResearch(o: {
   if (maxUses === 0) throw new BudgetExceeded('run search cap reached')
   await assertSearchSupported(o.model)
 
-  const { content, searchCapped, at } = await send(
+  const started = new Date().toISOString()
+  const sent = await send(
     {
       model: o.model,
       max_tokens: 16000,
-      system: o.system,
+      system: withRule(o.system),
       messages: [{ role: 'user', content: o.prompt }],
       tools: [webSearchTool(maxUses)],
       ...(o.effort && { output_config: { effort: o.effort } }),
     },
     { stage: o.stage, budget: o.budget, maxSearches: maxUses },
   )
+  const { content, searchCapped, at } = sent
 
   const pageAge = new Map<string, string | null>()
   for (const b of content)
@@ -143,5 +175,9 @@ export async function callResearch(o: {
       notes += ` [${s.n}]`
     }
   }
+  const queries = content.flatMap((b) => (b.type === 'server_tool_use' && b.name === 'web_search' && typeof (b.input as { query?: unknown }).query === 'string' ? [(b.input as { query: string }).query] : []))
+  const suspect = [...new Set([...sources.values()].flatMap((s) => s.quotes.flatMap(suspectInjection)))]
+  if (suspect.length) log('injection_suspected', { stage: o.stage, where: 'search results', phrases: suspect })
+  await o.budget.record(traced(o.stage, 'search', sent, started, { queries, found: pageAge.size, cited: sources.size, capped: searchCapped, suspect }))
   return { notes, sources: [...sources.values()], retrievedUrls: [...pageAge.keys()], searchCapped, at }
 }

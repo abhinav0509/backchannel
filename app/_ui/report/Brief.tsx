@@ -193,7 +193,7 @@ function HowYouFit({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfile:
 }
 
 /** The decision in one screen: the verdict, how it fits you, the six scores, and what argues each way. */
-export function Brief({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfile: boolean; onRefit?: () => Promise<string | null> }) {
+export function Brief({ r, hasProfile, onRefit, showFit = true }: { r: CompanyResearch; hasProfile: boolean; onRefit?: () => Promise<string | null>; showFit?: boolean }) {
   const risks = r.flags.filter((f) => f.polarity === 'risk').sort((a, b) => b.severity - a.severity)
   const greens = r.flags.filter((f) => f.polarity === 'green').sort((a, b) => b.severity - a.severity)
   const scores = DIMENSION_ORDER.flatMap((d) => r.scores.find((s) => s.dimension === d) ?? [])
@@ -214,7 +214,7 @@ export function Brief({ r, hasProfile, onRefit }: { r: CompanyResearch; hasProfi
         {rest && <p className="mt-4 max-w-[68ch] text-ink-2">{rest}</p>}
       </section>
 
-      <HowYouFit r={r} hasProfile={hasProfile} onRefit={onRefit} />
+      {showFit && <HowYouFit r={r} hasProfile={hasProfile} onRefit={onRefit} />}
 
       {scores.length > 0 && (
         <section aria-labelledby="signal" className="card p-5 sm:p-6">

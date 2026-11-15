@@ -27,7 +27,7 @@ describe('importProfile', () => {
     await importProfile(OWNER, { text: 'Jane Doe, designer since 2019' })
     const a = callStructured.mock.calls[0]![0]
     expect(a.document).toBeUndefined()
-    expect(a.prompt).toContain('<cv>\nJane Doe, designer since 2019\n</cv>')
+    expect(a.prompt).toContain('<untrusted source="CV">\nJane Doe, designer since 2019\n</untrusted>')
   })
 
   it('never guesses preferences the CV cannot state', () => {

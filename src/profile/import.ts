@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { MODELS } from '../config'
 import { callStructured } from '../llm/call'
+import { untrusted } from '../llm/untrusted'
 import { DEFAULT_WEIGHTS, Profile } from '../types/profile'
 import { ownerBudget } from '../util/cost'
 
@@ -42,7 +43,7 @@ export async function importProfile(owner: string, input: Input): Promise<Profil
     budget: await ownerBudget(owner),
     model: MODELS.parse,
     system: importSystem,
-    prompt: pdf ? importPrompt : `${importPrompt}\n\n<cv>\n${input.text}\n</cv>`,
+    prompt: pdf ? importPrompt : `${importPrompt}\n\n${untrusted('CV', input.text)}`,
     schema: ProfileDraft,
     // Thinking stays on: counting years across roles and picking the projects that matter needs it
     // (with it off, a test CV came back with half its experience and most skills missing).

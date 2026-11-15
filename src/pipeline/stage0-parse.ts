@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { MODELS } from '../config'
 import { callStructured } from '../llm/call'
 import { Role } from '../types/research'
+import { untrusted } from '../llm/untrusted'
 import type { Budget } from '../util/cost'
 
 export const ParseOut = z.object({
@@ -27,9 +28,7 @@ export const parsePrompt = (text: string) => `Extract the company, role, recruit
 - role.extracted_requirements: each requirement as a short phrase, as written.
 - comp_hint: quote any stated pay verbatim, else null.
 
-<recruiter_text>
-${text}
-</recruiter_text>`
+${untrusted('recruiter email', text)}`
 
 export async function parse(text: string, budget: Budget): Promise<ParseOut> {
   const { data } = await callStructured({

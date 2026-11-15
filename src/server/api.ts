@@ -174,6 +174,14 @@ export async function track(owner: string, id: string, body: unknown): Promise<R
   return reply(200, await repo.getOpportunity(owner, id))
 }
 
+/** Turns the report's read-only link on or off. */
+export async function share(owner: string, id: string, on: boolean): Promise<Reply> {
+  const o = await repo.getOpportunity(owner, id)
+  if (!o) return notFound()
+  if (on && !o.report) return reply(409, { error: 'Run full research first. Only a full report can be shared.' })
+  return reply(200, { share_id: await repo.setShared(owner, id, on) })
+}
+
 /** Running research would keep spending and then write to a row that no longer exists, so it must finish first. */
 export async function remove(owner: string, id: string): Promise<Reply> {
   const o = await repo.getOpportunity(owner, id)

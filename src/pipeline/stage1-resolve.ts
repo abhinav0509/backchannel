@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { Domain, Identity } from '../types/research'
+import { untrusted } from '../llm/untrusted'
 import type { Budget } from '../util/cost'
 import { researchRules, researchStage, today } from './shared'
 import type { ParseOut } from './stage0-parse'
@@ -30,14 +31,12 @@ Establish which company this is: legal name, primary website domain, headquarter
 ${companyDomain ? `The user has confirmed the company is the one whose website is ${companyDomain}. Research that company.` : `List every plausible company the text could mean, with its domain, and say how confident you are (0 to 1) that each is the one meant and why. Use the role, location, recruiter and any domain in the text to tell them apart. A bare common name with nothing to separate candidates is low confidence.`}
 
 WHAT THE TEXT SAYS
-<recruiter_text>
-company: ${p.company_name ?? '(not named)'}
+${untrusted('fields read from the recruiter email', `company: ${p.company_name ?? '(not named)'}
 domain seen in text: ${p.domain_guess ?? '(none)'}
 role: ${p.role.title}${p.role.level_claimed ? ` (${p.role.level_claimed})` : ''}
 location: ${p.role.location ?? '(not stated)'}
 recruiter: ${[p.recruiter.name, p.recruiter.agency].filter(Boolean).join(', ') || '(not stated)'}
-requirements: ${p.role.extracted_requirements.slice(0, 8).join('; ') || '(none)'}
-</recruiter_text>
+requirements: ${p.role.extracted_requirements.slice(0, 8).join('; ') || '(none)'}`)}
 
 ${researchRules(MAX_SEARCHES)}`
 

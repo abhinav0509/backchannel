@@ -30,6 +30,9 @@ describe('send', () => {
     expect(r.content).toEqual([{ type: 'text', text: 'a' }])
     expect(r.cached).toBe(false)
     expect(b.total.searches).toBe(2)
+    expect(r.spend).toMatchObject({ searches: 2, input: 1000, output: 100 })
+    expect(r.spend.usd).toBeCloseTo(b.total.usd)
+    expect(r.model).toBe('claude-sonnet-5-5')
   })
 
   it('serves an identical request from cache without calling the API or charging', async () => {
@@ -38,7 +41,7 @@ describe('send', () => {
     const b = budget()
     const second = await send(params, { stage: 'money', budget: b })
     expect(create).toHaveBeenCalledTimes(1)
-    expect(second).toMatchObject({ content: first.content, cached: true, at: first.at })
+    expect(second).toMatchObject({ content: first.content, cached: true, at: first.at, spend: { usd: 0 } })
     expect(b.total.usd).toBe(0)
   })
 

@@ -10,7 +10,7 @@ import { Monogram } from '../Monogram'
 import { Claims, Fact, Facts, n, NotYet, Section, Timeline, urls, type C } from './kit'
 
 type R = CompanyResearch
-type Deep = { onDeep?: () => void; running: boolean; starting?: boolean }
+type Deep = { onDeep?: () => void; running: boolean; starting?: boolean; shared?: boolean }
 
 function Lede<T>({ c, empty }: { c: C<T> | null; empty: string }) {
   if (!c) return <p className="t-small text-ink-3">{empty}</p>
@@ -176,13 +176,21 @@ function PeopleToKnow({ r, ...deep }: { r: R } & Deep) {
     <Section title="People to know for this role" aside="From public search results" id="contacts">
       {r.contacts === null ? (
         <p className="t-small text-ink-3">
-          Not researched for this report.{' '}
-          {deep.onDeep && !deep.running && (
-            <button className="font-semibold text-accent hover:underline" onClick={deep.onDeep}>
-              Run full research again
-            </button>
-          )}{' '}
-          to look for the likely hiring manager and the leadership above the role.
+          {deep.shared ? (
+            'Left out of shared reports, because it names people tied to the role.'
+          ) : (
+            <>
+              Not researched for this report.{' '}
+              {deep.onDeep && !deep.running && (
+                <>
+                  <button className="font-semibold text-accent hover:underline" onClick={deep.onDeep}>
+                    Run full research again
+                  </button>{' '}
+                  to look for the likely hiring manager and the leadership above the role.
+                </>
+              )}
+            </>
+          )}
         </p>
       ) : r.contacts.length === 0 ? (
         <p className="t-small text-ink-3">Nobody tied to this role turned up in public sources. The searches below are the next best thing.</p>

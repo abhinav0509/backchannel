@@ -1,28 +1,37 @@
 'use client'
 
 import { useContext } from 'react'
-import type { Opportunity } from '../../src/store/repo'
-import type { StageName } from '../../src/types/research'
+import Link from 'next/link'
+import type { RunRecord } from '../../src/store/repo'
+import type { CompanyResearch, StageName, TriageResult } from '../../src/types/research'
 import { age, stageLabel, usd } from '../_lib/format'
 import { SourcesContext } from './Evidence'
 
 const n = (x: number) => x.toLocaleString('en-US')
 
 /** Proof of work: what ran, what it cost, and every source used. */
-export function RunView({ o }: { o: Opportunity }) {
+export function RunView({ report, runs, inspect }: { report: CompanyResearch | TriageResult | null; runs: RunRecord[]; inspect: (runId: string) => string | null }) {
   const index = useContext(SourcesContext)
-  const deep = [...o.runs].reverse().find((r) => r.mode === 'deep' && r.status === 'done') ?? o.runs.at(-1)
-  const status = o.report?.run.stage_status ?? {}
+  const deep = [...runs].reverse().find((r) => r.mode === 'deep' && r.status === 'done') ?? runs.at(-1)
+  const status = report?.run.stage_status ?? {}
+  const deepHref = deep ? inspect(deep.id) : null
   const stages = deep ? (Object.entries(deep.stages) as [StageName, (typeof deep.stages)[StageName]][]) : []
 
   return (
     <div className="max-w-[760px] space-y-16">
       {deep && (
         <section>
-          <h2 className="t-title">This report</h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+            <h2 className="t-title">This report</h2>
+            {deepHref && (
+              <Link href={deepHref} className="t-small font-semibold text-accent hover:underline">
+                See how it ran, step by step
+              </Link>
+            )}
+          </div>
           <p className="mt-1 t-small text-ink-3">
             {n(deep.searches)} web searches, {n(deep.input_tokens + deep.output_tokens)} tokens, {usd(deep.cost_usd)}
-            {o.report && `, ${Math.round(o.report.run.duration_ms / 1000)} seconds`}. Repeated requests are served from cache at no cost.
+            {report && `, ${Math.round(report.run.duration_ms / 1000)} seconds`}. Repeated requests are served from cache at no cost.
           </p>
           <table className="mt-5 w-full t-small">
             <thead>
@@ -75,17 +84,27 @@ export function RunView({ o }: { o: Opportunity }) {
       <section>
         <h2 className="t-title">History</h2>
         <ul className="mt-4">
-          {[...o.runs].reverse().map((r) => (
-            <li key={r.id} className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3 t-small">
-              <span>
-                {r.mode === 'deep' ? 'Full research' : 'Quick check'}
-                <span className="text-ink-3"> {age(r.started_at).toLowerCase()}</span>
-                {r.status === 'failed' && <span className="block text-risk">{r.error}</span>}
-                {r.status === 'needs_choice' && <span className="block text-amber">Stopped to ask which company</span>}
-              </span>
-              <span className="tabular-nums text-ink-3">{usd(r.cost_usd)}</span>
-            </li>
-          ))}
+          {[...runs].reverse().map((r) => {
+            const href = inspect(r.id)
+            return (
+              <li key={r.id} className="flex items-baseline justify-between gap-4 border-b border-line-soft py-3 t-small">
+                <span className="min-w-0 break-words">
+                  {r.mode === 'deep' ? 'Full research' : 'Quick check'}
+                  <span className="text-ink-3"> {age(r.started_at).toLowerCase()}</span>
+                  {r.status === 'failed' && <span className="block text-risk">{r.error}</span>}
+                  {r.status === 'needs_choice' && <span className="block text-amber">Stopped to ask which company</span>}
+                </span>
+                <span className="flex shrink-0 items-baseline gap-4 tabular-nums text-ink-3">
+                  {usd(r.cost_usd)}
+                  {href && (
+                    <Link href={href} className="font-semibold text-accent hover:underline">
+                      Inspect
+                    </Link>
+                  )}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       </section>
     </div>

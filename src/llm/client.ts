@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import type { Budget } from '../util/cost'
+import { zeroSpend, type Budget, type Spend } from '../util/cost'
 import { cacheGet, cacheKey, cacheSet } from '../util/cache'
 import { log } from '../util/log'
 import type { StageName } from '../types/research'
@@ -12,6 +12,9 @@ export interface Sent {
   at: string // when the API produced this content; preserved on cache hits
   cached: boolean
   truncated?: boolean // the answer hit max_tokens: it is cut off, so a retry must ask for less
+  spend: Spend // what this call cost; zero when served from cache
+  ms: number
+  model: string // the model that answered, which a refusal fallback can change
 }
 
 let client: Anthropic | undefined
@@ -40,10 +43,10 @@ export async function send(
 ): Promise<Sent> {
   const key = cacheKey({ params, maxSearches: ctx.maxSearches })
   if (!process.env.BACKCHANNEL_FRESH) {
-    const hit = await cacheGet<Omit<Sent, 'cached'>>(key)
+    const hit = await cacheGet<Omit<Sent, 'cached' | 'spend' | 'ms' | 'model'>>(key)
     if (hit) {
       log('llm_cache_hit', { stage: ctx.stage, model: params.model })
-      return { ...hit, cached: true }
+      return { ...hit, cached: true, spend: zeroSpend(), ms: 0, model: params.model }
     }
   }
 
@@ -53,6 +56,9 @@ export async function send(
   let searches = 0
   let searchCapped = false
   let truncated = false
+  const spend = zeroSpend()
+  const t0 = Date.now()
+  let model = params.model
 
   for (;;) {
     ctx.budget.assertCanSpend()
@@ -71,6 +77,9 @@ export async function send(
       searches: u.server_tool_use?.web_search_requests ?? 0,
     }
     const usd = ctx.budget.charge(ctx.stage, res.model, usage)
+    model = res.model
+    for (const k of ['input', 'output', 'cacheRead', 'cacheWrite', 'searches'] as const) spend[k] += usage[k]
+    spend.usd += usd
     await ctx.budget.flush() // the spend is on record before anything else can fail
     searches += usage.searches
     content.push(...res.content)
@@ -89,5 +98,5 @@ export async function send(
 
   const sent = { content, searchCapped, at, ...(truncated && { truncated }) }
   await cacheSet(key, sent)
-  return { ...sent, cached: false }
+  return { ...sent, cached: false, spend, ms: Date.now() - t0, model }
 }

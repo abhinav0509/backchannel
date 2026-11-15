@@ -4,7 +4,9 @@ import { getDb } from '../db/db'
 import { Candidate } from '../pipeline/stage1-resolve'
 import { Profile } from '../types/profile'
 import { CompanyResearch, RunEvent, StageName, TriageResult, type StageStatus } from '../types/research'
+import { CallTrace } from '../types/trace'
 import { Pipeline, PipelineReason, PrepEntry, Round, RoundPatch, TrackingPatch } from '../types/tracking'
+import { isAdminOwner } from '../server/auth'
 import { runSpend } from '../util/cost'
 
 // Every function takes the owner and scopes its query by it. The server connects as a role that
@@ -54,6 +56,7 @@ export const Opportunity = z.object({
   next_step_at: z.string().nullable(),
   prep: z.record(z.string(), PrepEntry),
   rounds: z.array(Round),
+  share_id: z.string().nullable(),
 })
 export type Opportunity = z.infer<typeof Opportunity>
 
@@ -90,6 +93,7 @@ interface OppRow {
   triage: unknown
   report: unknown
   pipeline_at: Date
+  share_id?: string | null // absent until migration 0005 is applied
 }
 interface RunRow {
   id: string
@@ -145,6 +149,7 @@ export async function getOpportunity(owner: string, oppId: string): Promise<Oppo
     created_at: iso(row.created_at),
     updated_at: iso(row.updated_at),
     pipeline_at: iso(row.pipeline_at),
+    share_id: row.share_id ?? null,
     status: stalled ? 'failed' : row.status,
     error: stalled ? 'Research stalled and was stopped. Start it again.' : row.error,
     events: events.map((e) => ({ stage: e.stage, status: e.status, at: iso(e.at), ...(e.output != null && { output: e.output }), ...(e.error && { error: e.error }) })),
@@ -322,3 +327,101 @@ export async function saveProfile(owner: string, data: unknown): Promise<Profile
   return p
 }
 
+
+// ---------------------------------------------------------------------------------------------
+// Run inspector
+
+const TraceEvent = z.object({ stage: StageName, status: z.string(), at: z.iso.datetime(), error: z.string().nullable() })
+export const RunTrace = z.object({ run: RunRecord, events: z.array(TraceEvent), calls: z.array(CallTrace) })
+export type RunTrace = z.infer<typeof RunTrace>
+
+/** One run, step by step: its stage events (without their output) and every model call it made. */
+export async function runTrace(owner: string, oppId: string, runId: string): Promise<RunTrace | null> {
+  const o = await getOpportunity(owner, oppId)
+  const run = o?.runs.find((r) => r.id === runId)
+  if (!run) return null
+  const db = await getDb()
+  const [events, calls] = await Promise.all([
+    db.query<{ stage: string; status: string; at: Date; error: string | null }>('select stage, status, at, error from run_events where run_id = $1 order by id', [runId]),
+    db.query<Record<string, unknown> & { at: Date; usd: string | number }>(
+      `select stage, kind, model, at, ms, cached, usd::float8 as usd, input_tokens, output_tokens, searches, detail
+         from run_calls where run_id = $1 order by id`,
+      [runId],
+    ),
+  ])
+  return RunTrace.parse({
+    run,
+    events: events.map((e) => ({ ...e, at: iso(e.at) })),
+    calls: calls.map((c) => ({ ...c, at: iso(c.at), usd: Number(c.usd) })),
+  })
+}
+
+// ---------------------------------------------------------------------------------------------
+// Read-only sharing
+
+/** Turns a report's read-only link on (keeping an existing one) or off. Returns the share id, or null when off. */
+export async function setShared(owner: string, oppId: string, on: boolean): Promise<string | null> {
+  const o = await getOpportunity(owner, oppId)
+  if (!o) throw new Error(`no opportunity ${oppId}`)
+  if (on && !o.report) throw new Error('there is no report to share yet')
+  if (on && o.share_id) return o.share_id
+  const shareId = on ? id(16) : null
+  await (await getDb()).query('update opportunities set share_id = $1, shared_at = case when $1::text is null then null else now() end where id = $2 and owner_id = $3', [shareId, oppId, owner])
+  return shareId
+}
+
+/** What a shared link shows: the research and how it was produced. Never the email, notes, prep, rounds or the owner's fit. */
+export const Shared = z.object({
+  share_id: z.string(),
+  report: CompanyResearch,
+  runs: z.array(RunRecord),
+  report_run_id: z.string().nullable(),
+})
+export type Shared = z.infer<typeof Shared>
+
+const PROFILE_SCORES = new Set(['role_fit', 'career_signal'])
+
+/** The run that produced the current report: the latest finished full research. */
+export const reportRun = (runs: RunRecord[]) => [...runs].reverse().find((r) => r.mode === 'deep' && r.status === 'done') ?? null
+
+async function sharedOpportunity(shareId: string): Promise<{ owner: string; o: Opportunity } | null> {
+  if (!/^[a-f0-9]{32}$/.test(shareId)) return null
+  const [row] = await (await getDb()).query<{ id: string; owner_id: string }>('select id, owner_id from opportunities where share_id = $1', [shareId])
+  const o = row && (await getOpportunity(row.owner_id, row.id))
+  return o ? { owner: row.owner_id, o } : null
+}
+
+export async function getShared(shareId: string): Promise<Shared | null> {
+  const o = (await sharedOpportunity(shareId))?.o
+  if (!o?.report) return null
+  return {
+    share_id: shareId,
+    // Judged against the owner's CV: fit, profile flags and the two profile scores. Contacts name
+    // private people. None of it belongs on a public page. Free text (verdict, questions) can still
+    // mention the owner's experience; the share panel says so.
+    report: {
+      ...o.report,
+      fit: null,
+      contacts: null,
+      flags: o.report.flags.filter((f) => f.basis !== 'profile'),
+      scores: o.report.scores.filter((s) => !PROFILE_SCORES.has(s.dimension)),
+    },
+    runs: o.runs.filter((r) => r.mode === 'deep'),
+    report_run_id: reportRun(o.runs)?.id ?? null,
+  }
+}
+
+/** The trace behind a shared report's own run. */
+export async function sharedTrace(shareId: string): Promise<RunTrace | null> {
+  const s = await sharedOpportunity(shareId)
+  const run = s?.o.report ? reportRun(s.o.runs) : null
+  return s && run ? runTrace(s.owner, s.o.id, run.id) : null
+}
+
+/** The admin's most recently shared report, offered as the public demo. */
+export async function demoShareId(): Promise<string | null> {
+  const rows = await (await getDb()).query<{ share_id: string; owner_id: string }>(
+    'select share_id, owner_id from opportunities where share_id is not null and report is not null order by shared_at desc limit 50',
+  )
+  return rows.find((r) => isAdminOwner(r.owner_id))?.share_id ?? null
+}

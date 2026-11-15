@@ -2,6 +2,8 @@ import { BUDGETS, ESTIMATE_USD } from '../config'
 import { isAdminOwner } from '../server/auth'
 import { getDb } from '../db/db'
 import type { StageName } from '../types/research'
+import type { CallRecord } from '../types/trace'
+import { log } from './log'
 
 export interface Spend {
   input: number
@@ -52,7 +54,7 @@ export class Budget {
   constructor(
     private readonly limits: { searchesPerRun: number; tokensPerRun: number },
     private readonly month: { spentBefore: number; capUsd: number },
-    private readonly opts: { initial?: Spend; persist?: Persist; member?: { spentBefore: number; capUsd: number } } = {},
+    private readonly opts: { initial?: Spend; persist?: Persist; trace?: (c: CallRecord) => Promise<void>; member?: { spentBefore: number; capUsd: number } } = {},
   ) {
     this.total = { ...(opts.initial ?? zeroSpend()) }
   }
@@ -83,6 +85,11 @@ export class Budget {
     }
     if (this.opts.persist) this.pending.push(this.opts.persist(stage, model, u, usd))
     return usd
+  }
+
+  /** Keeps what a call did, for the run inspector. A failed write is logged and never fails the run. */
+  async record(c: CallRecord): Promise<void> {
+    await this.opts.trace?.(c).catch((e: unknown) => log('trace_write_failed', { stage: c.stage, error: String(e) }))
   }
 
   /** Waits until every charge so far is written. Call before the next billed request. */
@@ -150,6 +157,16 @@ export async function runBudget(mode: 'triage' | 'deep', runId: string | null): 
           [runId, owner, stage, model, u.input, u.output, u.cacheRead, u.cacheWrite, u.searches, usd],
         )
       },
+      ...(runId &&
+        owner && {
+          trace: async (c) => {
+            await db.query(
+              `insert into run_calls (run_id, owner_id, stage, kind, model, at, ms, cached, usd, input_tokens, output_tokens, searches, detail)
+               values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+              [runId, owner, c.stage, c.kind, c.model, c.at, c.ms, c.cached, c.usd, c.input_tokens, c.output_tokens, c.searches, JSON.stringify(c.detail)],
+            )
+          },
+        }),
     },
   )
 }

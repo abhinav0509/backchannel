@@ -230,3 +230,15 @@ describe('inbox', () => {
     expect(r.agenda).toEqual([expect.objectContaining({ type: 'upcoming', opportunity: expect.objectContaining({ id: o.id }) })])
   })
 })
+
+describe('share', () => {
+  it('shares only a full report, and only for its owner', async () => {
+    const o = await repo.createOpportunity(ME, 'x')
+    expect((await api.share(ME, o.id, true)).status).toBe(409)
+    await repo.patchOpportunity(ME, o.id, { report: validReport(), status: 'done' })
+    expect((await api.share(OTHER, o.id, true)).status).toBe(404)
+    const on = await api.share(ME, o.id, true)
+    expect(on).toMatchObject({ status: 200, body: { share_id: expect.stringMatching(/^[a-f0-9]{32}$/) } })
+    expect(await api.share(ME, o.id, false)).toEqual({ status: 200, body: { share_id: null } })
+  })
+})

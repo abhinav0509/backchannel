@@ -100,6 +100,13 @@ function LoginForm() {
           {error}
         </p>
       )}
+      <p className="mt-12 border-t border-line-soft pt-5 t-small text-ink-3">
+        Backchannel is invite-only.{' '}
+        <a href="/demo" className="font-medium text-accent hover:underline">
+          Read a sample report
+        </a>
+        , and see step by step how the agents researched it.
+      </p>
     </section>
   )
 }

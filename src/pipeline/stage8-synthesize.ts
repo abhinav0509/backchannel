@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { MODELS } from '../config'
 import { collectEvidenceUrls } from '../llm/evidence'
 import { callStructured } from '../llm/call'
+import { untrusted } from '../llm/untrusted'
 import type { Profile } from '../types/profile'
 import { Fit, Flag, Question, QuestionTopic, Score, ScoreDimension, type CompanyResearch } from '../types/research'
 import type { Budget } from '../util/cost'
@@ -44,10 +45,10 @@ export const synthPrompt = (draft: Draft, profile: Profile | null) => `TASK
 ${synthTask}
 
 CANDIDATE PROFILE
-${profile ? JSON.stringify(profile, null, 2) : 'No candidate profile was provided. role_fit and career_signal cannot be judged against the candidate: mark them unknown and say so in gaps.'}
+${profile ? untrusted('candidate profile', JSON.stringify(profile, null, 2)) : 'No candidate profile was provided. role_fit and career_signal cannot be judged against the candidate: mark them unknown and say so in gaps.'}
 
 RESEARCH
-${JSON.stringify(findings(draft), null, 2)}`
+${untrusted('research drawn from web pages', JSON.stringify(findings(draft), null, 2))}`
 
 export async function synthesize(input: { draft: Draft; profile: Profile | null }, budget: Budget) {
   return callStructured({
